@@ -3,9 +3,10 @@ import { resolve, dirname } from 'node:path'
 import { existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
+
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
@@ -47,11 +48,10 @@ function embedHtmlDevFallback(): Plugin {
     },
   }
 }
-const DEV_PROXY_TARGET =
-  process.env.VITE_DEV_PROXY_TARGET ||
-  process.env.FRONTEND_BACKEND_URL ||
-  'http://localhost:8080'
-
+// const DEV_PROXY_TARGET =
+//   process.env.VITE_DEV_PROXY_TARGET ||
+//   process.env.FRONTEND_BACKEND_URL ||
+//   'http://localhost:8080'
 function resolveVueOfficePptxEntry(): string {
   try {
     const pkgDir = dirname(require.resolve('@vue-office/pptx/package.json'))
@@ -67,7 +67,19 @@ function resolveVueOfficePptxEntry(): string {
   }
 }
 
-export default defineConfig({
+export default defineConfig(({mode}) => {
+  // 加载 .env / .env.local / .env.[mode] 等
+  const env = loadEnv(mode, process.cwd(), '')
+
+  const DEV_PROXY_TARGET =
+    env.VITE_DEV_PROXY_TARGET ||
+    env.FRONTEND_BACKEND_URL ||
+    process.env.VITE_DEV_PROXY_TARGET ||
+    'http://localhost:8080'
+
+  console.log('DEV_PROXY_TARGET', DEV_PROXY_TARGET)
+
+  return{
   define: {
     __FRONTEND_VERSION__: JSON.stringify(FRONTEND_VERSION),
     __FRONTEND_COMMIT__: JSON.stringify(FRONTEND_COMMIT),
@@ -128,7 +140,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: 5566,
     host: true,
     // 代理配置，用于开发环境
     proxy: {
@@ -167,4 +179,4 @@ export default defineConfig({
       }
     }
   }
-})
+}})
