@@ -99,8 +99,8 @@ importers:
         specifier: ^5.106.2
         version: 5.111.0
       xlsx:
-        specifier: file:./packages/xlsx-0.20.2.tgz
-        version: file:packages/xlsx-0.20.2.tgz
+        specifier: https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz
+        version: https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz
     devDependencies:
       '@tsconfig/node22':
         specifier: ^22.0.5
@@ -2033,8 +2033,8 @@ packages:
     engines: {node: ^18.17.0 || >=20.5.0}
     hasBin: true
 
-  xlsx@file:packages/xlsx-0.20.2.tgz:
-    resolution: {integrity: sha512-+nKZ39+nvK7Qq6i0PvWWRA4j/EkfWOtkP/YhMtupm+lJIiHxUrgTr1CcKv1nBk1rHtkRRQ3O2+Ih/q/sA+FXZA==, tarball: file:packages/xlsx-0.20.2.tgz}
+  xlsx@https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz:
+    resolution: {integrity: sha512-+nKZ39+nvK7Qq6i0PvWWRA4j/EkfWOtkP/YhMtupm+lJIiHxUrgTr1CcKv1nBk1rHtkRRQ3O2+Ih/q/sA+FXZA==, tarball: https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz}
     version: 0.20.2
     engines: {node: '>=0.8'}
     hasBin: true
@@ -3891,6 +3891,6 @@ snapshots:
     dependencies:
       isexe: 3.1.5
 
-  xlsx@file:packages/xlsx-0.20.2.tgz: {}
+  xlsx@https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz: {}
 
   yallist@3.1.1: {}

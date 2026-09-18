@@ -48,6 +48,33 @@ function embedHtmlDevFallback(): Plugin {
     },
   }
 }
+
+/** Dev parity with nginx: serve embedPro.html for /embed-pro/ (and sub-paths). */
+function embedProHtmlDevFallback(): Plugin {
+  return {
+    name: 'embed-pro-html-dev-fallback',
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        const raw = req.url ?? ''
+        const qIdx = raw.indexOf('?')
+        const path = qIdx >= 0 ? raw.slice(0, qIdx) : raw
+        const qs = qIdx >= 0 ? raw.slice(qIdx) : ''
+
+        // 命中 /embed-pro 或 /embed-pro/xxx 且不是静态资源
+        // 注意排除 /embed-pro.html 本身，避免死循环
+        if (
+          (path === '/embed-pro' || path.startsWith('/embed-pro/')) &&
+          path !== '/embed-pro.html' &&
+          !path.includes('.')
+        ) {
+          req.url = `/embedPro.html${qs}`
+        }
+        next()
+      })
+    },
+  }
+}
+
 // const DEV_PROXY_TARGET =
 //   process.env.VITE_DEV_PROXY_TARGET ||
 //   process.env.FRONTEND_BACKEND_URL ||
@@ -111,6 +138,7 @@ export default defineConfig(({mode}) => {
       input: {
         main: resolve(__dirname, 'index.html'),
         embed: resolve(__dirname, 'embed.html'),
+        embedPro: resolve(__dirname, 'embedPro.html'),
       },
       output: {
         manualChunks(id) {
@@ -132,6 +160,7 @@ export default defineConfig(({mode}) => {
     vue(),
     vueJsx(),
     embedHtmlDevFallback(),
+    embedProHtmlDevFallback()
   ],
   resolve: {
     alias: {
