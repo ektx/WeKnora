@@ -47,16 +47,19 @@
         </div>
     </div>
 
-    <ContextualGuide tour="chat" :when="showChatContextualGuide" />
-
     <!-- 知识库编辑器（创建/编辑统一组件） -->
-    <KnowledgeBaseEditorModal :visible="uiStore.showKBEditorModal" :mode="uiStore.kbEditorMode"
-        :kb-id="uiStore.currentKBId || undefined" :initial-type="uiStore.kbEditorType"
-        @update:visible="(val) => val ? null : uiStore.closeKBEditor()" @success="handleKBEditorSuccess" />
+    <KnowledgeBaseEditorModal 
+        :visible="uiStore.showKBEditorModal" 
+        :mode="uiStore.kbEditorMode"
+        :kb-id="uiStore.currentKBId || undefined" 
+        :initial-type="uiStore.kbEditorType"
+        @update:visible="(val) => val ? null : uiStore.closeKBEditor()" 
+        @success="handleKBEditorSuccess" 
+    />
 </template>
 <script setup lang="ts">
 import { ref, watch, onMounted, nextTick, computed } from 'vue';
-import ContextualGuide from '@/components/ContextualGuide.vue';
+// import ContextualGuide from '@/components/ContextualGuide.vue';
 import InputField from '@/components/Input-field.vue';
 import { createSessions } from "@/api/chat/index";
 import { getSuggestedQuestions } from "@/api/agent/index";
@@ -69,7 +72,7 @@ import { MessagePlugin } from 'tdesign-vue-next';
 import { useI18n } from 'vue-i18n';
 import KnowledgeBaseEditorModal from '@/views/knowledge/KnowledgeBaseEditorModal.vue';
 import { useKnowledgeBaseCreationNavigation } from '@/hooks/useKnowledgeBaseCreationNavigation';
-debugger
+
 const router = useRouter();
 const route = useRoute();
 const usemenuStore = useMenuStore();
@@ -79,6 +82,7 @@ const { t } = useI18n();
 const { navigateToKnowledgeBaseList } = useKnowledgeBaseCreationNavigation();
 
 const showChatContextualGuide = computed(() => {
+    debugger
     return route.name === 'globalCreatChat' || route.name === 'kbCreatChat';
 });
 
