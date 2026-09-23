@@ -4655,7 +4655,7 @@ export default {
     }
   },
   createChat: {
-    title: 'Hi，我是 WeKnora，让你的知识触手可及',
+    title: 'Hi，我是灵镜智冶，让你的知识触手可及',
     newSessionTitle: '新会话',
     messages: {
       createFailed: '创建会话失败',
