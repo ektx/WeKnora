@@ -14,6 +14,7 @@
              右侧抽屉弹出时会自然覆盖；仅在有待处理邀请时渲染。 -->
         <GlobalInvitationBell />
         <!-- 带遮罩层的新手引导：首次进入自动开启，可从用户菜单顶部昵称旁帮助按钮重新打开 -->
+        <!-- <NewUserGuide /> -->
         
         <Menu></Menu>
     </div>
@@ -26,6 +27,7 @@ import UploadMask from '@/components/upload-mask.vue'
 import Settings from '@/views/settings/Settings.vue'
 import GlobalCommandPalette from '@/components/GlobalCommandPalette.vue'
 import GlobalInvitationBell from '@/components/GlobalInvitationBell.vue'
+// import NewUserGuide from '@/components/NewUserGuide.vue'
 import { useCommandPaletteStore } from '@/stores/commandPalette'
 import { useChatResourcesStore } from '@/stores/chatResources'
 import { useUIStore } from '@/stores/ui'
