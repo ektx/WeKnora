@@ -61,11 +61,17 @@ export function isEmbedPage(): boolean {
   return window.location.pathname.startsWith('/embed/')
 }
 
+// 注意 这里修改了原文件
 export function redirectToLogin() {
   if (typeof window === 'undefined') return
   if (window.location.pathname === '/login') return
   if (isEmbedPage()) return
-  window.location.href = '/login'
+
+  if (window.location.pathname.startsWith('/embed-pro/')) {
+    window.location.href = '/embed-pro/login'
+  } else {
+    window.location.href = '/login'
+  }
 }
 
 export function clearAuthStorage() {
