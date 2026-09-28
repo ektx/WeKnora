@@ -50,7 +50,7 @@ const router = createRouter({
   routes: [
     {
       path: "/",
-      redirect: "/platform/embed-pro-creatChat",
+      redirect: "/platform/creatChat",
     },
 
     {
@@ -162,12 +162,12 @@ const router = createRouter({
         {
           path: "creatChat",
           name: "globalCreatChat",
-          component: () => import("../views/creatChat/creatChat.vue"),
-          meta: { requiresInit: true, requiresAuth: true }
-        },
-        {
-          path: "embed-pro-creatChat",
-          name: "embedPro-globalCreatChat",
+        //   component: () => import("../views/creatChat/creatChat.vue"),
+        //   meta: { requiresInit: true, requiresAuth: true }
+        // },
+        // {
+        //   path: "embed-pro-creatChat",
+        //   name: "embedPro-globalCreatChat",
           component: () => import("../views/embedProCreateChat/creatChat.vue"),
           meta: { requiresInit: true, requiresAuth: true }
         },
@@ -180,7 +180,7 @@ const router = createRouter({
         {
           path: "chat/:chatid",
           name: "chat",
-          component: () => import("../views/chat/index.vue"),
+          component: () => import("../views/embedChat/index.vue"),
           meta: { requiresInit: true, requiresAuth: true }
         },
         {
@@ -316,6 +316,7 @@ let liteDeepLinkRestoreDone = false
 
 // 路由守卫：检查认证状态和系统初始化状态
 router.beforeEach(async (to, from, next) => {
+  console.warn('router.beforeEach', to, from)
   const authStore = useAuthStore()
 
   // OIDC 回跳登录结果依赖 App.vue 在挂载后消费 URL hash。
