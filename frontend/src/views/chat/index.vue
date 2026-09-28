@@ -148,7 +148,9 @@
             </div>
         </transition>
         <div class="input-container" :class="{ 'is-embedded': embeddedMode }">
-            <InputField ref="inputFieldRef" :auto-focus="focusComposerOnMount"
+            <InputField 
+                ref="inputFieldRef" 
+                :auto-focus="focusComposerOnMount"
                 @send-msg="(query, modelId, mentionedItems, imageFiles, attachmentFiles) => sendMsg(query, modelId, mentionedItems, imageFiles, attachmentFiles)"
                 @steer-msg="(query, mentionedItems, delivery) => handleSteerMsg(query, mentionedItems, delivery)"
                 @promote-steer="handlePromoteSteer"
@@ -156,9 +158,14 @@
                 @retry-steer="handleRetrySteer"
                 @stop-generation="handleStopGeneration"
                 @stop-confirmed="handleStopConfirmed"
-                @stop-failed="handleStopFailed" :isReplying="isReplying" :sessionId="session_id"
-                :assistantMessageId="currentAssistantMessageId" :embeddedMode="embeddedMode"
-                :queuedSteers="steerQueue.filter(item => item.delivery === 'after')" :canSteer="isAgentStreamSession()"></InputField>
+                @stop-failed="handleStopFailed" 
+                :isReplying="isReplying" 
+                :sessionId="session_id"
+                :assistantMessageId="currentAssistantMessageId" 
+                :embeddedMode="embeddedMode"
+                :queuedSteers="steerQueue.filter(item => item.delivery === 'after')" 
+                :canSteer="isAgentStreamSession()"
+            ></InputField>
         </div>
     </div>
     <KnowledgeBaseEditorModal :visible="uiStore.showKBEditorModal" :mode="uiStore.kbEditorMode"
