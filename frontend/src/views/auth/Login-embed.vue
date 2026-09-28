@@ -15,7 +15,6 @@ import {
 import { notifyLoginSuccess } from '@/utils/loginNotify'
 import { useAuthStore } from '@/stores/auth'
 
-
 const loading = ref(false)
 const router = useRouter()
 const route = useRoute()
@@ -113,7 +112,6 @@ const handleLogin = async () => {
 
 
 onMounted(() => {
-    debugger
     console.log('Login mounted')
     handleLogin()
 })
