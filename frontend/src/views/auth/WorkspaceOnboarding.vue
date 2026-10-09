@@ -116,6 +116,7 @@ async function onTenantCreated(tenant: TenantInfo) {
 }
 
 async function handleLogout() {
+  console.warn('handleLogout')
   await logoutApi()
   authStore.logout()
   await router.replace('/login')

@@ -38,6 +38,7 @@ export const useBrowserConnectionStore = defineStore('browserConnection', {
       this.loaded = true
     },
     async refresh() {
+      debugger
       const result = await get<{ data: BrowserAccountStatus }>('/api/v1/me/browser', {
         signal: pollController?.signal,
       })

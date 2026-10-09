@@ -138,7 +138,14 @@
                     </div>
                 </div>
             </div>
-            <BrowserTaskPreview v-if="!embeddedMode && session_id" :key="session_id" :session-id="session_id" />
+
+            <!-- 浏览器任务预览 让 AI Agent 借用你已登录的浏览器去操作网页，同时你在一个浮动小窗里实时看到它在做什么，必要时还能“接管”一下。 -->
+            <!-- <BrowserTaskPreview 
+                v-if="!embeddedMode && session_id" 
+                :key="session_id" 
+                :session-id="session_id" 
+            /> -->
+            
             <ChatQuestionMinimap v-if="!embeddedMode" :scroll-container="scrollContainer" :messages="messagesList"
                 @jump="jumpToQuestion" />
         </div>

@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="guide-fade">
-      <div v-if="active" class="guide" role="dialog" aria-modal="true" :aria-label="stepTitle"
+      <div v-if="active" class="guide 456" role="dialog" aria-modal="true" :aria-label="stepTitle"
         @keydown.esc.prevent="dismiss" @keydown.left.prevent="prev" @keydown.right.prevent="next" tabindex="-1"
         ref="rootRef">
         <template v-if="hole">

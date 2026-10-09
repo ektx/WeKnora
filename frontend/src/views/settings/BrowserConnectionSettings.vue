@@ -150,6 +150,7 @@ let alive = true, timer: ReturnType<typeof setTimeout> | undefined, expiry: Retu
 const formatDate = (value: string) => new Date(value).toLocaleString(locale.value, { dateStyle: 'short', timeStyle: 'short' })
 function clearPairing() { pairing.value = ''; copied.value = false; copyFallback.value = false; clearTimeout(expiry) }
 async function refresh() {
+  debugger
   try {
     if (!busy.value && !document.hidden) {
       const current = revision

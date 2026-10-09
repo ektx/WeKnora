@@ -126,6 +126,7 @@ const persistOIDCLoginResponse = async (response: any) => {
 }
 
 const handleGlobalOIDCCallback = async () => {
+  debugger
   const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : ''
   if (!hash) return
 

@@ -1108,6 +1108,7 @@ const getCurrentKbId = async (): Promise<string | null> => {
 }
 
 const gotopage = async (path: string) => {
+    debugger
     pathPrefix.value = path;
     // 处理退出登录
     if (path === 'logout') {

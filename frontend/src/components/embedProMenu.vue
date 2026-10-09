@@ -46,7 +46,7 @@
         </t-tooltip>
 
         <!-- 空间选择器：仅在用户可切换空间时显示 -->
-        <TenantSelector v-if="canAccessAllTenants && !uiStore.sidebarCollapsed" />
+        <!-- <TenantSelector v-if="canAccessAllTenants && !uiStore.sidebarCollapsed" /> -->
 
         <!-- 折叠时右侧拖拽展开手柄 -->
         <!-- <div v-if="uiStore.sidebarCollapsed" class="sidebar-drag-handle" @mousedown="onDragHandleMouseDown" /> -->
@@ -55,7 +55,10 @@
         <div class="menu_top" ref="scrollContainer" @scroll="handleScroll">
             <!-- 全局搜索入口：点击打开命令面板（⌘K）。展开态移至顶部 logo_row 的图标按钮；
                  折叠态在此处保留为图标项 + 深色 tooltip。 -->
-            <div class="menu_box menu_box--cmdk" v-if="uiStore.sidebarCollapsed">
+            <div 
+                class="menu_box menu_box--cmdk" 
+                v-if="uiStore.sidebarCollapsed"
+            >
                 <t-tooltip placement="right">
                     <template #content>
                         <span class="cmdk-tip">
@@ -72,6 +75,7 @@
                     </div>
                 </t-tooltip>
             </div>
+            
             <div 
                 class="menu_box" 
                 :class="{ 'menu_box--sticky': item.children && !uiStore.sidebarCollapsed }"
@@ -1111,6 +1115,7 @@ const getCurrentKbId = async (): Promise<string | null> => {
 }
 
 const gotopage = async (path: string) => {
+    debugger
     pathPrefix.value = path;
     // 处理退出登录
     if (path === 'logout') {

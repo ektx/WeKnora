@@ -82,6 +82,7 @@ const handleOpenEvent = () => {
 }
 
 onMounted(() => {
+  debugger
   window.addEventListener(OPEN_NEW_USER_GUIDE_EVENT, handleOpenEvent)
   if (localStorage.getItem(GLOBAL_USER_GUIDE_KEY) !== '1') {
     window.setTimeout(() => {

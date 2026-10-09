@@ -295,6 +295,7 @@ const closePasswordPopup = () => {
 }
 
 const submitPasswordChange = async () => {
+  debugger
   if (passwordSubmitting.value) return
   const result = await passwordFormRef.value?.validate?.()
   if (result !== true) return

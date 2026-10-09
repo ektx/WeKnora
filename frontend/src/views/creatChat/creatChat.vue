@@ -50,9 +50,13 @@
     <ContextualGuide tour="chat" :when="showChatContextualGuide" />
 
     <!-- 知识库编辑器（创建/编辑统一组件） -->
-    <KnowledgeBaseEditorModal :visible="uiStore.showKBEditorModal" :mode="uiStore.kbEditorMode"
-        :kb-id="uiStore.currentKBId || undefined" :initial-type="uiStore.kbEditorType"
-        @update:visible="(val) => val ? null : uiStore.closeKBEditor()" @success="handleKBEditorSuccess" />
+    <!-- <KnowledgeBaseEditorModal 
+        :visible="uiStore.showKBEditorModal" 
+        :mode="uiStore.kbEditorMode"
+        :kb-id="uiStore.currentKBId || undefined" 
+        :initial-type="uiStore.kbEditorType"
+        @update:visible="(val) => val ? null : uiStore.closeKBEditor()" 
+        @success="handleKBEditorSuccess" /> -->
 </template>
 <script setup lang="ts">
 import { ref, watch, onMounted, nextTick, computed } from 'vue';
