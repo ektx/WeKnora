@@ -25,7 +25,7 @@ import { ref, onMounted, onUnmounted, nextTick, provide, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router'
 import UploadMask from '@/components/upload-mask.vue'
 import Settings from '@/views/settings/Settings.vue'
-import GlobalCommandPalette from '@/components/GlobalCommandPalette.vue'
+import GlobalCommandPalette from '@/components/EmbedProGlobalCommandPalette.vue'
 import GlobalInvitationBell from '@/components/GlobalInvitationBell.vue'
 // import NewUserGuide from '@/components/NewUserGuide.vue'
 import { useCommandPaletteStore } from '@/stores/commandPalette'
