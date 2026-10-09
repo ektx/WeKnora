@@ -14,7 +14,7 @@
 //	Get/List → GET  /containers/json?filters=label=…
 //	Delete   → DELETE /containers/{id}?force=1
 //	Exec     → POST /containers/{id}/exec → /exec/{id}/start (hijack)
-//	Snapshot → POST /commit (skill images under weknora-skill/)
+//	Snapshot → POST /commit (skill images under weknora-skill/, fork images under weknora-fork/)
 //
 // Every file operation uses exec with an explicit account (root by default),
 // timeout and activity tracking. Archive endpoints bypass those exec settings.
@@ -417,6 +417,14 @@ func (c *DockerRemoteClient) Connect(
 		id:       inspected.Container.ID,
 		metadata: dockerSandboxMetadata(labels),
 	}, nil
+}
+
+// ConnectSession already gets the lifecycle state from Connect's container
+// inspection, including terminal detection and resuming a stopped container.
+func (c *DockerRemoteClient) ConnectSession(
+	ctx context.Context, req RemoteConnectRequest,
+) (RemoteSandboxHandle, error) {
+	return c.Connect(ctx, req)
 }
 
 // dockerStartReadyTimeout bounds how long Create/Connect/Exec wait for PID 1
@@ -884,7 +892,7 @@ func (c *DockerRemoteClient) WriteFile(
 		return dockerError("WriteFile", err)
 	}
 	if result.ExitCode != 0 {
-		return dockerFileOpError("WriteFile", clean, result.Stderr)
+		return c.dockerFileOpFailed(ctx, id, "WriteFile", clean, result.Stderr, result.ExitCode)
 	}
 	return nil
 }
@@ -919,7 +927,7 @@ func (c *DockerRemoteClient) ReadFile(
 		return nil, dockerError("ReadFile", err)
 	}
 	if result.ExitCode != 0 {
-		return nil, dockerFileOpError("ReadFile", clean, result.Stderr)
+		return nil, c.dockerFileOpFailed(ctx, id, "ReadFile", clean, result.Stderr, result.ExitCode)
 	}
 	return []byte(result.Stdout), nil
 }
@@ -963,7 +971,7 @@ func (c *DockerRemoteClient) Stat(
 		return nil, dockerError("Stat", err)
 	}
 	if result.ExitCode != 0 {
-		return nil, dockerFileOpError("Stat", clean, result.Stderr)
+		return nil, c.dockerFileOpFailed(ctx, id, "Stat", clean, result.Stderr, result.ExitCode)
 	}
 	entries := parseDockerFindOutput(result.Stdout)
 	if len(entries) == 0 {
@@ -986,7 +994,18 @@ func (c *DockerRemoteClient) Stat(
 // NotFound so callers can treat it as "nothing there"; everything else,
 // permission denials included, is an invalid request carrying the tool's own
 // complaint rather than a synthesised one.
-func dockerFileOpError(op, clean, stderr string) error {
+// dockerFileOpFailed classifies a filesystem op's non-zero exec exit. The
+// message carries the exit code — with an empty stderr it used to be the
+// only missing clue (issue #3942). When the exec raced the idle sweeper's
+// delete (ensureRunning's inspect passes, the sweep removes the container,
+// the exec dies mid-flight), the failure surfaces as exit != 0 with an
+// empty stderr; the re-inspect reclassifies it as NotFound so
+// CanReplaceRemoteBinding lets the rebinding self-heal take over — making
+// the sweeper's "deleting needs no coordination with the binding store"
+// premise hold for this window too (issue #3942, mechanism A).
+func (c *DockerRemoteClient) dockerFileOpFailed(
+	ctx context.Context, id, op, clean, stderr string, exitCode int,
+) error {
 	if strings.Contains(stderr, "No such file or directory") {
 		return &RemoteError{
 			Kind:     RemoteErrorKindNotFound,
@@ -995,12 +1014,30 @@ func dockerFileOpError(op, clean, stderr string) error {
 			Message:  clean + " does not exist",
 		}
 	}
+	if c.containerVanished(ctx, id, op) {
+		return &RemoteError{
+			Kind:     RemoteErrorKindNotFound,
+			Provider: SandboxTypeDocker,
+			Op:       op,
+			Message: fmt.Sprintf("%s %s: exit=%d: container vanished mid-op (likely idle sweep)",
+				op, clean, exitCode),
+		}
+	}
 	return &RemoteError{
 		Kind:     RemoteErrorKindInvalidRequest,
 		Provider: SandboxTypeDocker,
 		Op:       op,
-		Message:  fmt.Sprintf("%s %s: %s", op, clean, firstNonEmptyLine(stderr)),
+		Message:  fmt.Sprintf("%s %s: exit=%d: %s", op, clean, exitCode, firstNonEmptyLine(stderr)),
 	}
+}
+
+// containerVanished reports whether the Engine confirms the container is
+// gone (404). A transport or daemon error returns false — only a confirmed
+// disappearance may reclassify, keeping unknown errors on the safe side of
+// CanReplaceRemoteBinding's allow-list.
+func (c *DockerRemoteClient) containerVanished(ctx context.Context, id, op string) bool {
+	_, err := c.api.ContainerInspect(ctx, id, client.ContainerInspectOptions{})
+	return err != nil && IsRemoteNotFound(dockerError(op, err))
 }
 
 // MakeDir creates a directory (and its parents) inside the sandbox.
@@ -1031,12 +1068,7 @@ func (c *DockerRemoteClient) makeDir(ctx context.Context, id, dir, op string) er
 		return dockerError(op, err)
 	}
 	if result.ExitCode != 0 {
-		return &RemoteError{
-			Kind:     RemoteErrorKindInvalidRequest,
-			Provider: SandboxTypeDocker,
-			Op:       op,
-			Message:  fmt.Sprintf("mkdir -p %s: %s", dir, firstNonEmptyLine(result.Stderr)),
-		}
+		return c.dockerFileOpFailed(ctx, id, op, dir, result.Stderr, result.ExitCode)
 	}
 	return nil
 }
@@ -1068,12 +1100,7 @@ func (c *DockerRemoteClient) Remove(
 		return dockerError("Remove", err)
 	}
 	if result.ExitCode != 0 {
-		return &RemoteError{
-			Kind:     RemoteErrorKindInvalidRequest,
-			Provider: SandboxTypeDocker,
-			Op:       "Remove",
-			Message:  fmt.Sprintf("rm -rf %s: %s", clean, firstNonEmptyLine(result.Stderr)),
-		}
+		return c.dockerFileOpFailed(ctx, id, "Remove", clean, result.Stderr, result.ExitCode)
 	}
 	return nil
 }
@@ -1115,6 +1142,15 @@ func (c *DockerRemoteClient) ListDir(
 				Provider: SandboxTypeDocker,
 				Op:       "ListDir",
 				Message:  clean + " does not exist",
+			}
+		}
+		if c.containerVanished(ctx, id, "ListDir") {
+			return nil, &RemoteError{
+				Kind:     RemoteErrorKindNotFound,
+				Provider: SandboxTypeDocker,
+				Op:       "ListDir",
+				Message: fmt.Sprintf("ListDir %s: exit=%d: container vanished mid-op (likely idle sweep)",
+					clean, result.ExitCode),
 			}
 		}
 		return nil, &RemoteError{
@@ -1183,8 +1219,12 @@ func (c *DockerRemoteClient) ensureImage(ctx context.Context, image string) erro
 	// Skill snapshots are daemon-local commits, not registry tags. Pulling
 	// one would hit Docker Hub for a name we minted and never pushed, and a
 	// miss here means "this daemon does not have the image", not "fetch it".
-	if dockerIsSkillSnapshotRef(image) {
-		return dockerInvalidRequest("Create", "skill snapshot image "+image+" is not on this daemon")
+	if dockerIsLocalSnapshotRef(image) {
+		kind := "skill"
+		if dockerIsForkSnapshotRef(image) {
+			kind = "fork"
+		}
+		return dockerInvalidRequest("Create", kind+" snapshot image "+image+" is not on this daemon")
 	}
 	pullCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), dockerImagePullBudget)
 	defer cancel()

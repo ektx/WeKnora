@@ -173,6 +173,14 @@ export default defineConfig(({mode}) => {
     host: true,
     // 代理配置，用于开发环境
     proxy: {
+      '/mcp/': {
+        target: DEV_PROXY_TARGET,
+        changeOrigin: true,
+        secure: false,
+        // Streamable HTTP may keep an SSE response open for long-running tools.
+        timeout: 3_600_000,
+        proxyTimeout: 3_600_000,
+      },
       '/api': {
         target: DEV_PROXY_TARGET,
         changeOrigin: true,
@@ -180,6 +188,10 @@ export default defineConfig(({mode}) => {
         // 沙箱终端等 WebSocket 升级请求也走 /api，必须开启 WS 转发，
         // 否则浏览器侧握手失败、前端表现为"一直正在连接"。
         ws: true,
+        // Cube fork snapshots pause a live MicroVM; 30s axios/proxy defaults
+        // abort the POST and the backend then 500s on a canceled persist.
+        timeout: 180_000,
+        proxyTimeout: 180_000,
       },
       '/files': {
         target: DEV_PROXY_TARGET,
@@ -195,11 +207,20 @@ export default defineConfig(({mode}) => {
     port: 4173,
     host: true,
     proxy: {
+      '/mcp/': {
+        target: DEV_PROXY_TARGET,
+        changeOrigin: true,
+        secure: false,
+        timeout: 3_600_000,
+        proxyTimeout: 3_600_000,
+      },
       '/api': {
         target: DEV_PROXY_TARGET,
         changeOrigin: true,
         secure: false,
         ws: true,
+        timeout: 180_000,
+        proxyTimeout: 180_000,
       },
       '/files': {
         target: DEV_PROXY_TARGET,

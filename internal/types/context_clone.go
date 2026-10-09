@@ -44,6 +44,9 @@ var contextCloneAcrossDetach = map[ContextKey]bool{
 	// Per-API-key operation and KB scopes: a restriction, so dropping it would
 	// hand background work broader reach than the key it came from.
 	TenantAPIKeyScopeContextKey: true,
+	// Display identity for which API key initiated work. Not a grant; dropping
+	// it would only lose activity attribution on detached goroutines.
+	AuditAPIKeyContextKey: true,
 
 	// Session scope. SessionTenantID re-scopes session/message lookups, while
 	// SandboxTenantID keys the session→sandbox binding to the session owner
@@ -107,6 +110,11 @@ var contextCloneAcrossDetach = map[ContextKey]bool{
 	// ingest pipeline, which is what detached work should look like; an
 	// inherited "user" would attribute a background rewrite to a person.
 	WikiEditSourceContextKey: false,
+	// One write's licence to remove table rows the stored page still has. A
+	// grant, and a detach must not widen it: the marker is put on the context
+	// immediately around a single write by a caller that knows the removal is
+	// deliberate, so it means nothing on any other context.
+	WikiShrinkAllowedContextKey: false,
 	// The parser engine resolved from one agent's ChatParserEngineRules for
 	// one attachment's file type. Read by the attachment processor on the same
 	// context that set it, and meaningless for anything else.
@@ -115,6 +123,9 @@ var contextCloneAcrossDetach = map[ContextKey]bool{
 	// request context inside the embed handler that authenticated it; nothing
 	// downstream of a detach reads it.
 	EmbedChannelContextKey: false,
+	// The authenticated MCP endpoint. Read only by the MCP tool handlers on
+	// the request context that authenticated it.
+	MCPEndpointContextKey: false,
 }
 
 // ContextKeysClonedAcrossDetach returns the keys logger.CloneContext carries

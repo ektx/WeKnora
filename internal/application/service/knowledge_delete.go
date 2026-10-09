@@ -41,6 +41,55 @@ func collectImageURLs(ctx context.Context, imageInfos []string) []string {
 	return urls
 }
 
+// mergeKnowledgeReleaseURLs unions ImageInfo URLs with derived catalog
+// bindings for the knowledge entries being removed. Parsed documents often
+// embed resource:// handles only in markdown; multimodal ImageInfo is empty
+// until (or unless) those tasks finish, so attachment/extracted-image rows
+// are the complete claim set. Source files stay out of this list: reparse
+// and manual cleanup must keep the original document, and knowledge delete
+// already removes FilePath separately.
+//
+// Only call this from a path that is removing the knowledge for good
+// (executeKnowledgeDelete, ProcessKBDelete). Cleanup that runs before a
+// re-index must keep collecting ImageInfo alone: the knowledge survives it,
+// and DeleteFile marks the object deleted, so the re-claim that follows could
+// not resolve the handles it dropped.
+func mergeKnowledgeReleaseURLs(
+	ctx context.Context,
+	catalog interfaces.ResourceCatalog,
+	knowledgeIDs []string,
+	imageURLs []string,
+) []string {
+	seen := make(map[string]struct{}, len(imageURLs))
+	out := make([]string, 0, len(imageURLs))
+	add := func(url string) {
+		url = strings.TrimSpace(url)
+		if url == "" {
+			return
+		}
+		if _, exists := seen[url]; exists {
+			return
+		}
+		seen[url] = struct{}{}
+		out = append(out, url)
+	}
+	for _, url := range imageURLs {
+		add(url)
+	}
+	if catalog == nil || len(knowledgeIDs) == 0 {
+		return out
+	}
+	refs, err := catalog.ListReferencesByOwner(ctx, types.ResourceOwnerKnowledge, knowledgeIDs...)
+	if err != nil {
+		logger.Warnf(ctx, "Failed to list knowledge resource bindings for release: %v", err)
+		return out
+	}
+	for _, ref := range refs {
+		add(ref)
+	}
+	return out
+}
+
 // knowledgeResourceOwners builds the releaser for a set of knowledge entries
 // being deleted. A nil catalog (no resource registry) yields nil, which
 // deleteExtractedImages treats as "delete unconditionally", i.e. the behaviour
@@ -345,9 +394,8 @@ func (s *knowledgeService) prepareWikiForReparse(ctx context.Context, knowledge 
 // Handles both old format ("knowledgeID") and new format ("knowledgeID|title").
 func removeSourceRef(refs types.StringArray, knowledgeID string) types.StringArray {
 	var result types.StringArray
-	prefix := knowledgeID + "|"
 	for _, ref := range refs {
-		if ref == knowledgeID || strings.HasPrefix(ref, prefix) {
+		if types.WikiSourceRefMatchesKnowledge(ref, knowledgeID) {
 			continue
 		}
 		result = append(result, ref)
@@ -477,6 +525,9 @@ func (s *knowledgeService) executeKnowledgeDelete(plan *knowledgeDeletePlan, sin
 	for _, k := range knowledgeList {
 		kbKnowledgeIDs[k.KnowledgeBaseID] = append(kbKnowledgeIDs[k.KnowledgeBaseID], k.ID)
 	}
+	for kbID, ids := range kbKnowledgeIDs {
+		kbImageURLs[kbID] = mergeKnowledgeReleaseURLs(ctx, s.resourceCatalog, ids, kbImageURLs[kbID])
+	}
 
 	wg := errgroup.Group{}
 	// 2. Delete knowledge embeddings from vector store
@@ -597,6 +648,9 @@ func (s *knowledgeService) executeKnowledgeDelete(plan *knowledgeDeletePlan, sin
 		byKB[knowledge.KnowledgeBaseID] = append(byKB[knowledge.KnowledgeBaseID], knowledge)
 	}
 	for kbID, knowledges := range byKB {
+		// Deleted documents simply drop out of the description aggregation;
+		// the refresh recomputes counts and topics from what remains.
+		_ = requestKnowledgeBaseProfileRefresh(ctx, s.task, knowledgeBases[kbID], false)
 		knowledgeIDs := make([]string, 0, len(knowledges))
 		titles := make([]string, 0, len(knowledges))
 		for _, knowledge := range knowledges {
@@ -667,6 +721,14 @@ func (s *knowledgeService) cleanupKnowledgeResources(ctx context.Context, knowle
 	for _, ci := range chunkImageInfos {
 		imageInfoStrs = append(imageInfoStrs, ci.ImageInfo)
 	}
+	// Release only what ImageInfo accounts for. This cleanup runs before the
+	// knowledge is re-indexed (manual update, reparse, move with reparse), not
+	// before it goes away, and the re-claim in triggerManualProcessing can only
+	// succeed while the object is alive: DeleteFile marks the resource deleted,
+	// and Bind resolves through a state=active lookup, so the handle could never
+	// be re-bound. Unioning in catalog bindings here would therefore delete
+	// markdown-only images that the new body still references. The paths that
+	// actually remove a knowledge entry do union -- see mergeKnowledgeReleaseURLs.
 	imageURLs := collectImageURLs(ctx, imageInfoStrs)
 
 	if err := s.chunkRepo.DeleteChunksByKnowledgeID(ctx, knowledge.TenantID, knowledge.ID); err != nil {

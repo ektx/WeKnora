@@ -42,8 +42,9 @@ func copyOwnedObject(
 	srcPath string,
 	tenantID uint64,
 	knowledgeID string,
+	catalog interfaces.ResourceCatalog,
+	relation string,
 ) (string, error) {
-	_ = knowledgeID // exports objects are tenant-scoped, not knowledge-scoped
 	rc, err := srcSvc.GetFile(ctx, srcPath)
 	if err != nil {
 		return "", fmt.Errorf("read source image %q: %w", srcPath, err)
@@ -59,7 +60,33 @@ func copyOwnedObject(
 	if err != nil {
 		return "", fmt.Errorf("save copied image for %q: %w", srcPath, err)
 	}
+	bindCopiedResource(ctx, catalog, newPath, knowledgeID, relation)
 	return newPath, nil
+}
+
+// bindCopiedResource claims a cloned object for the destination knowledge.
+// Non-catalog paths (legacy provider:// URLs) are left unbound, matching
+// Release's treatment of pre-registry locators.
+//
+// Best-effort, like every other claim path (bindContentResources,
+// bindStoredImages): a missed claim degrades to an object only its own
+// workspace can fetch -- the file proxies report 403 for everyone else. The
+// copy is already written by the time we get here, so failing the clone would
+// both discard a correct copy and strand the object we just created.
+func bindCopiedResource(
+	ctx context.Context,
+	catalog interfaces.ResourceCatalog,
+	ref, knowledgeID, relation string,
+) {
+	if catalog == nil || knowledgeID == "" || relation == "" {
+		return
+	}
+	if _, ok := types.ParseResourcePath(ref); !ok {
+		return
+	}
+	if err := catalog.Bind(ctx, ref, types.ResourceOwnerKnowledge, knowledgeID, relation); err != nil {
+		logger.Warnf(ctx, "Failed to bind cloned resource %s to knowledge %s: %v", ref, knowledgeID, err)
+	}
 }
 
 // imageExtForCopy resolves the file extension to use for a copied image. It
@@ -114,6 +141,7 @@ func cloneChunkImageInfo(
 	tenantID uint64,
 	knowledgeID string,
 	urlCache map[string]string,
+	catalog interfaces.ResourceCatalog,
 ) (newImageInfo string, copiedURLs []string, err error) {
 	if srcImageInfo == "" {
 		return "", nil, nil
@@ -132,7 +160,9 @@ func cloneChunkImageInfo(
 
 		newURL, cached := urlCache[img.URL]
 		if !cached {
-			newURL, err = copyOwnedObject(ctx, dstSvc, dstSvc, img.URL, tenantID, knowledgeID)
+			newURL, err = copyOwnedObject(
+				ctx, dstSvc, dstSvc, img.URL, tenantID, knowledgeID,
+				catalog, types.ResourceRelationExtractedImage)
 			if err != nil {
 				return "", copiedURLs, fmt.Errorf("failed to copy chunk image %q: %w", img.URL, err)
 			}
@@ -210,7 +240,13 @@ func (s *knowledgeService) CloneKnowledgeBase(ctx context.Context, srcID, dstID 
 		p := &types.KBCloneProgress{TaskID: access.TransferTaskID(ctx), SourceID: source.ID, TargetID: target.ID}
 		return s.cloneFAQKnowledgeBase(ctx, source, target, p, func(*types.KBCloneProgress, error, string) {})
 	}
-	return s.executeKnowledgeClone(ctx, source, target, nil)
+	if err := s.executeKnowledgeClone(ctx, source, target, nil); err != nil {
+		return err
+	}
+	// Derive the target's description from the cloned documents now rather
+	// than on the next upload.
+	_ = requestKnowledgeBaseProfileRefresh(ctx, s.task, target, false)
+	return nil
 }
 
 // CloneChunk clone chunks from one knowledge to another
@@ -251,6 +287,14 @@ func (s *knowledgeService) CloneChunk(ctx context.Context, src, dst *types.Knowl
 	sourceChunks, err := s.transferChunks(ctx, src, sourceKB.ID)
 	if err != nil {
 		return err
+	}
+	// Image vectors exist only in a knowledge base that opted in to them
+	// (indexImageVector). A copy into one that did not leaves them behind, the
+	// index rows with the chunks: CopyIndices copies only mapped chunks' rows.
+	if !targetKB.IsImageVectorEnabled() {
+		sourceChunks = slices.DeleteFunc(sourceChunks, func(c *types.Chunk) bool {
+			return c.ChunkType == types.ChunkTypeImageVector
+		})
 	}
 	chunkPageSize := 100
 	srcTodst := map[string]string{}
@@ -323,7 +367,7 @@ func (s *knowledgeService) CloneChunk(ctx context.Context, src, dst *types.Knowl
 		// child chunks, so a parent text chunk's ![](url) reference cannot be
 		// rewritten until its child image chunk has been processed).
 		newImageInfo, copied, copyErr := cloneChunkImageInfo(
-			ctx, dstSvc, sourceChunk.ImageInfo, dst.TenantID, dst.ID, urlCache)
+			ctx, dstSvc, sourceChunk.ImageInfo, dst.TenantID, dst.ID, urlCache, s.resourceCatalog)
 		copiedURLs = append(copiedURLs, copied...)
 		if copyErr != nil {
 			err = fmt.Errorf("clone chunk image copy failed: %w", copyErr)
@@ -351,6 +395,7 @@ func (s *knowledgeService) CloneChunk(ctx context.Context, src, dst *types.Knowl
 			Metadata:        sourceChunk.Metadata,
 			ContentHash:     sourceChunk.ContentHash,
 			ImageInfo:       newImageInfo,
+			SourceLocators:  sourceChunk.SourceLocators,
 			CreatedAt:       now,
 			UpdatedAt:       now,
 		}
@@ -387,6 +432,7 @@ func (s *knowledgeService) CloneChunk(ctx context.Context, src, dst *types.Knowl
 			return err
 		}
 	}
+	s.bindChunkResources(ctx, dst.TenantID, dst.ID, targetChunks)
 
 	tenantID := types.MustTenantIDFromContext(ctx)
 	// Route CopyIndices via the source KB's bound store. This function does
@@ -596,6 +642,12 @@ func (s *knowledgeService) ProcessKBClone(ctx context.Context, t *asynq.Task) er
 	if err := s.saveKBCloneProgress(ctx, progress); err != nil {
 		logger.Errorf(ctx, "Failed to update KB clone progress to completed: %v", err)
 	}
+	// Derive the target's description from the cloned documents now instead
+	// of waiting for the next upload. dstKB is the loaded target (type and
+	// profile_config included); `target` above is only the reservation stub
+	// when the clone created the knowledge base, and the refresh helper
+	// would reject it.
+	_ = requestKnowledgeBaseProfileRefresh(ctx, s.task, dstKB, false)
 
 	logger.Infof(ctx, "KB clone task completed: %s", payload.TaskID)
 	recordKBActivity(ctx, s.audit, payload.TenantID, payload.TargetID, types.AuditActionKBCloneCompleted,
@@ -806,7 +858,7 @@ func (s *knowledgeService) cloneFAQKnowledgeBase(
 			// Deep-copy extracted images into objects owned by the destination
 			// FAQ knowledge so deleting the source never breaks this clone.
 			newImageInfo, copied, copyErr := cloneChunkImageInfo(
-				ctx, dstSvc, srcChunk.ImageInfo, dstKB.TenantID, dstKnowledge.ID, imageURLCache)
+				ctx, dstSvc, srcChunk.ImageInfo, dstKB.TenantID, dstKnowledge.ID, imageURLCache, s.resourceCatalog)
 			if copyErr != nil {
 				logger.Errorf(ctx, "Failed to copy FAQ chunk images: %v", copyErr)
 				handleError(progress, copyErr, "Failed to copy FAQ entry images")
@@ -842,6 +894,7 @@ func (s *knowledgeService) cloneFAQKnowledgeBase(
 			handleError(progress, err, "Failed to create FAQ entries")
 			return err
 		}
+		s.bindChunkResources(ctx, dstKB.TenantID, dstKnowledge.ID, newChunks)
 
 		// Saved rows now own these images, including when indexing later fails.
 		// A later batch failure must not delete files from an earlier saved batch.
@@ -1179,6 +1232,10 @@ func (s *knowledgeService) ProcessKnowledgeMove(ctx context.Context, t *asynq.Ta
 	progress.Error = ""
 	_ = s.saveKnowledgeMoveProgress(ctx, progress)
 	record(types.AuditActionKnowledgeMoveCompleted, types.AuditOutcomeSuccess)
+	// A move is a delete on the source and an add on the target as far as
+	// the description aggregation is concerned.
+	_ = requestKnowledgeBaseProfileRefresh(ctx, s.task, sourceKB, false)
+	_ = requestKnowledgeBaseProfileRefresh(ctx, s.task, targetKB, false)
 	return nil
 }
 
