@@ -114,16 +114,23 @@ const handleLogin = async () => {
 
 
 onMounted(() => {
-    console.log('Login mounted')
-    handleLogin()
+  handleLogin()
 })
 </script>
 
-<style lang="css" scoped>
+<style lang="less" scoped>
+@import '../../components/css/chat-timeline-loading.less';
+
 .login-view {
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100%;
+
+    h1 {
+      font-size: 24px;
+      font-weight: 400;
+      .chat-stream-shimmer-text();
+    }
 }
 </style>
