@@ -2,16 +2,19 @@
   <div class="markdown-test-page">
     <h1 class="page-title">Markdown Rendering Test</h1>
     <p class="page-desc">
-      Dev-only page for visual regression testing of chat answer markdown
-      (same typography as botmsg / AgentStreamDisplay / embed).
-      Add new test cases or paste arbitrary markdown in the editor below.
+      Dev-only page for visual regression testing of chat answer markdown (same
+      typography as botmsg / AgentStreamDisplay / embed). Add new test cases or
+      paste arbitrary markdown in the editor below.
     </p>
 
     <!-- Basic Text Styles (GPT markdown test doc alignment) -->
     <section class="test-section">
       <h2>Basic Text Styles</h2>
       <div class="test-case">
-        <div class="test-rendered markdown-content" v-html="basicTextHtml"></div>
+        <div
+          class="test-rendered markdown-content"
+          v-html="basicTextHtml"
+        ></div>
       </div>
     </section>
 
@@ -19,7 +22,9 @@
     <section class="test-section">
       <h2>LaTeX Formulas</h2>
       <div v-for="(tc, i) in latexCases" :key="'latex-' + i" class="test-case">
-        <div class="test-raw"><code>{{ tc.raw }}</code></div>
+        <div class="test-raw">
+          <code>{{ tc.raw }}</code>
+        </div>
         <div class="test-rendered markdown-content" v-html="tc.html"></div>
       </div>
     </section>
@@ -28,7 +33,10 @@
     <section class="test-section">
       <h2>Code Blocks</h2>
       <div class="test-case">
-        <div class="test-rendered markdown-content" v-html="codeBlockHtml"></div>
+        <div
+          class="test-rendered markdown-content"
+          v-html="codeBlockHtml"
+        ></div>
       </div>
     </section>
 
@@ -60,34 +68,57 @@
     <section class="test-section">
       <h2>Mermaid Diagram</h2>
       <div class="test-case">
-        <div ref="mermaidContainer" class="test-rendered markdown-content" v-html="mermaidHtml"></div>
+        <div
+          ref="mermaidContainer"
+          class="test-rendered markdown-content"
+          v-html="mermaidHtml"
+        ></div>
       </div>
     </section>
 
     <!-- customization -->
     <section class="test-section">
       <h2>Customization</h2>
-      <p>这是一个自定义的节点，支持标题与内容的展示。还可以设置控制按钮与后台进行数据交互。</p>
+      <p>
+        这是一个自定义的节点，支持标题与内容的展示。还可以设置控制按钮与后台进行数据交互。
+      </p>
       <div class="test-case">
-        <div ref="mermaidContainer" class="test-rendered markdown-content" v-html="customNodeHtml"></div>
+        <div
+          ref="mermaidContainer"
+          class="test-rendered markdown-content"
+          v-html="customNodeHtml"
+        ></div>
       </div>
     </section>
 
     <!-- Streaming Simulation -->
     <section class="test-section">
       <h2>Streaming Simulation</h2>
-      <p class="test-hint">Simulates character-by-character streaming, like during a chat response.</p>
+      <p class="test-hint">
+        Simulates character-by-character streaming, like during a chat response.
+      </p>
       <div class="stream-controls">
-        <button @click="startStream" :disabled="isStreaming" class="btn">Start</button>
+        <button @click="startStream" :disabled="isStreaming" class="btn">
+          Start
+        </button>
         <button @click="resetStream" class="btn">Reset</button>
         <label class="speed-label">
           Speed:
-          <input type="range" min="10" max="20000" v-model.number="streamSpeed" />
+          <input
+            type="range"
+            min="10"
+            max="20000"
+            v-model.number="streamSpeed"
+          />
           {{ streamSpeed }}ms
         </label>
       </div>
       <div class="test-case">
-        <div ref="streamContainer" class="test-rendered markdown-content" v-html="streamHtml"></div>
+        <div
+          ref="streamContainer"
+          class="test-rendered markdown-content"
+          v-html="streamHtml"
+        ></div>
       </div>
     </section>
 
@@ -96,7 +127,8 @@
       <h2>Streaming Shimmer</h2>
       <p class="test-hint">
         The "light sweep" applied to in-progress step titles in
-        AgentStreamDisplay / RagPipelineProgress. Running steps shimmer; finished ones are static.
+        AgentStreamDisplay / RagPipelineProgress. Running steps shimmer;
+        finished ones are static.
       </p>
       <div class="test-case shimmer-demo">
         <div class="action-card action-pending">
@@ -121,70 +153,79 @@
     <section class="test-section">
       <h2>Custom Input</h2>
       <p class="test-hint">Paste any markdown here to test rendering.</p>
-      <textarea v-model="customInput" class="custom-textarea" rows="8"
-        placeholder="Type or paste markdown here..."></textarea>
+      <textarea
+        v-model="customInput"
+        class="custom-textarea"
+        rows="8"
+        placeholder="Type or paste markdown here..."
+      ></textarea>
       <div v-if="customInput.trim()" class="test-case">
-        <div ref="customContainer" class="test-rendered markdown-content" v-html="customHtml"></div>
+        <div
+          ref="customContainer"
+          class="test-rendered markdown-content"
+          v-html="customHtml"
+        ></div>
       </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue';
-import 'katex/dist/katex.min.css';
-import { sanitizeMarkdownHTML } from '@/utils/security';
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import 'katex/dist/katex.min.css'
+import { sanitizeMarkdownHTML } from '@/utils/security'
 import {
   createChatMarkdownRenderer,
-  renderChatMarkdown,
-} from '@/utils/chatMarkdownRenderer';
+  renderChatMarkdown
+} from '@/utils/chatMarkdownRenderer'
 import {
   appendMermaidSvgCache,
   ensureMermaidInitialized,
   enhanceMarkdownContainer,
-  createMermaidCodeRenderer,
-} from '@/utils/mermaidShared';
+  createMermaidCodeRenderer
+} from '@/utils/mermaidShared'
 import {
   replaceIncompleteMermaidWithPlaceholder,
   prepareStreamingMermaidMarkdown,
   extractMermaidCodes,
-  injectCachedMermaidSvg,
-} from '@/utils/chatMessageShared';
+  injectCachedMermaidSvg
+} from '@/utils/chatMessageShared'
 
-ensureMermaidInitialized();
+ensureMermaidInitialized()
 
 const mermaidRenderer = createChatMarkdownRenderer({
-  codeRenderer: createMermaidCodeRenderer('mermaid-test'),
-});
+  codeRenderer: createMermaidCodeRenderer('mermaid-test')
+})
 
-const mermaidContainer = ref<HTMLElement | null>(null);
-const streamContainer = ref<HTMLElement | null>(null);
-const customContainer = ref<HTMLElement | null>(null);
+const mermaidContainer = ref<HTMLElement | null>(null)
+const streamContainer = ref<HTMLElement | null>(null)
+const customContainer = ref<HTMLElement | null>(null)
 
 const render = (raw: string): string => {
-  if (!raw) return '';
+  if (!raw) return ''
   return renderChatMarkdown(raw, {
     renderer: mermaidRenderer,
-    escapeMarkdown: (markdown) => markdown,
+    escapeMarkdown: markdown => markdown,
     sanitizeHtml: sanitizeMarkdownHTML,
-    prepareMarkdown: (markdown) => replaceIncompleteMermaidWithPlaceholder(markdown),
-  });
-};
+    prepareMarkdown: markdown =>
+      replaceIncompleteMermaidWithPlaceholder(markdown)
+  })
+}
 
 const renderStreamMarkdown = (raw: string): string => {
-  if (!raw) return '';
+  if (!raw) return ''
   return renderChatMarkdown(raw, {
     renderer: mermaidRenderer,
-    escapeMarkdown: (markdown) => markdown,
+    escapeMarkdown: markdown => markdown,
     sanitizeHtml: sanitizeMarkdownHTML,
     // Match production: the live chat marks unfinished answers as streaming so
     // mid-stream guards (dangling emphasis, trailing rules) are exercised here.
     streaming: isStreaming.value,
     cachedMermaidSvgHtml: streamMermaidSvgHtml.value,
     prepareMarkdown: prepareStreamingMermaidMarkdown,
-    injectCachedMermaidSvg,
-  });
-};
+    injectCachedMermaidSvg
+  })
+}
 
 // --- Test Data ---
 
@@ -200,17 +241,23 @@ const basicTextSample = `这是一段普通文本，包含 **加粗**、*斜体*
 
 - [ ] 未完成任务
 - [x] 已完成任务
-`;
+`
 
 const latexCases = [
   { raw: 'Inline math: $E = mc^2$ in the middle of text.' },
   { raw: 'Block math:\n$$\\int_0^\\infty e^{-x}\\,dx = 1$$' },
-  { raw: 'Chemical formula: $\\mathrm{Mg}^{2+} + 2\\mathrm{OH}^{-} = \\mathrm{Mg(OH)}_{2}\\downarrow$' },
-  { raw: 'Chemical block:\n$$\\mathrm{Cu}^{2+} + 2\\mathrm{OH}^{-} \\rightarrow \\mathrm{Cu(OH)_2}\\downarrow$$' },
+  {
+    raw: 'Chemical formula: $\\mathrm{Mg}^{2+} + 2\\mathrm{OH}^{-} = \\mathrm{Mg(OH)}_{2}\\downarrow$'
+  },
+  {
+    raw: 'Chemical block:\n$$\\mathrm{Cu}^{2+} + 2\\mathrm{OH}^{-} \\rightarrow \\mathrm{Cu(OH)_2}\\downarrow$$'
+  },
   { raw: 'Summation: $\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}$' },
   { raw: 'Matrix:\n$$\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$$' },
-  { raw: 'Escaped delimiters: \\(\\alpha + \\beta = \\gamma\\) and \\[\\int_a^b f(x)\\,dx\\]' },
-].map((tc) => ({ ...tc, html: '' }));
+  {
+    raw: 'Escaped delimiters: \\(\\alpha + \\beta = \\gamma\\) and \\[\\int_a^b f(x)\\,dx\\]'
+  }
+].map(tc => ({ ...tc, html: '' }))
 
 const codeBlockSample = `Here is some Python:
 
@@ -225,7 +272,7 @@ print(fibonacci(10))  # 55
 \`\`\`
 
 And inline code: \`const x = 42;\`
-`;
+`
 
 const tableSample = `| Element | Symbol | Atomic Number |
 |---------|--------|:-------------:|
@@ -233,7 +280,7 @@ const tableSample = `| Element | Symbol | Atomic Number |
 | Helium | He | 2 |
 | Lithium | Li | 3 |
 | Carbon | C | 6 |
-`;
+`
 
 const listsSample = `### Ordered List
 1. First item
@@ -253,7 +300,7 @@ const listsSample = `### Ordered List
 > This is a blockquote with **bold** and *italic* text.
 >
 > It can span multiple paragraphs.
-`;
+`
 
 const mixedSample = `## Quadratic Formula
 
@@ -282,7 +329,7 @@ def solve_quadratic(a, b, c):
 | 1 | 2 | 5 | No real solutions |
 
 > **Note:** The discriminant $\\Delta = b^2 - 4ac$ determines the nature of the roots.
-`;
+`
 
 const mermaidSample = `\`\`\`mermaid
 graph TD
@@ -292,8 +339,7 @@ graph TD
     C --> E[End]
     D --> E
 \`\`\`
-`;
-
+`
 
 const customNodeSample = `::: control
 title: 自定义节点
@@ -302,7 +348,7 @@ btn(value1): 确认
 btn(value2): 取消
 btn(value3): 关闭
 :::
-`;
+`
 
 // --- Streaming Simulation ---
 const fullStreamText = `
@@ -315,6 +361,8 @@ const fullStreamText = `
 APR = ((Fees + Interest) / Principal) × (365 / Days in Loan Term)
 \`\`\`
 <kb doc="2502.08127v1.pdf" chunk_id="1ecdce8a-f922-4d0c-b124-257ab4634da2" />
+
+${customNodeSample}
 
 ### 重要性
 
@@ -429,118 +477,115 @@ sequenceDiagram
     Note right of Cloud: 用于事故定责与算法优化
 \`\`\`
 
-::: control
-title: 自定义节点
-subtitle: 通过自定义节点类型和样式
-btn(value1): 确认
-btn(value2): 取消
-btn(value3): 关闭
-:::
+Done.`
 
-Done.`;
-
-const streamBuffer = ref('');
-const isStreaming = ref(false);
-const streamSpeed = ref(30);
-const customInput = ref('');
-const streamMermaidSvgHtml = ref<string[]>([]);
-let streamTimer: ReturnType<typeof setInterval> | null = null;
-let streamMermaidRenderTask: Promise<void> | null = null;
+const streamBuffer = ref('')
+const isStreaming = ref(false)
+const streamSpeed = ref(30)
+const customInput = ref('')
+const streamMermaidSvgHtml = ref<string[]>([])
+let streamTimer: ReturnType<typeof setInterval> | null = null
+let streamMermaidRenderTask: Promise<void> | null = null
 
 // Pre-render static fixtures once so streaming ticks do not reset other sections.
-latexCases.forEach((tc) => {
-  tc.html = render(tc.raw);
-});
-const codeBlockHtml = render(codeBlockSample);
-const basicTextHtml = render(basicTextSample);
-const tableHtml = render(tableSample);
-const listsHtml = render(listsSample);
-const mixedHtml = render(mixedSample);
-const mermaidHtml = render(mermaidSample);
+latexCases.forEach(tc => {
+  tc.html = render(tc.raw)
+})
+const codeBlockHtml = render(codeBlockSample)
+const basicTextHtml = render(basicTextSample)
+const tableHtml = render(tableSample)
+const listsHtml = render(listsSample)
+const mixedHtml = render(mixedSample)
+const mermaidHtml = render(mermaidSample)
 const customNodeHtml = render(customNodeSample)
 
-const streamHtml = computed(() => renderStreamMarkdown(streamBuffer.value));
-const customHtml = computed(() => render(customInput.value));
+const streamHtml = computed(() => renderStreamMarkdown(streamBuffer.value))
+const customHtml = computed(() => render(customInput.value))
 
 const cacheStreamMermaidSvg = async () => {
-  const codes = extractMermaidCodes(streamBuffer.value);
-  if (codes.length <= streamMermaidSvgHtml.value.length) return;
+  const codes = extractMermaidCodes(streamBuffer.value)
+  if (codes.length <= streamMermaidSvgHtml.value.length) return
 
   if (!streamMermaidRenderTask) {
     streamMermaidRenderTask = (async () => {
       streamMermaidSvgHtml.value = await appendMermaidSvgCache(
         extractMermaidCodes(streamBuffer.value),
         streamMermaidSvgHtml.value,
-        'mermaid-stream',
-      );
+        'mermaid-stream'
+      )
     })().finally(() => {
-      streamMermaidRenderTask = null;
-    });
+      streamMermaidRenderTask = null
+    })
   }
 
-  await streamMermaidRenderTask;
+  await streamMermaidRenderTask
 
-  if (extractMermaidCodes(streamBuffer.value).length > streamMermaidSvgHtml.value.length) {
-    await cacheStreamMermaidSvg();
+  if (
+    extractMermaidCodes(streamBuffer.value).length >
+    streamMermaidSvgHtml.value.length
+  ) {
+    await cacheStreamMermaidSvg()
   }
-};
+}
 
 const startStream = () => {
-  resetStream();
-  isStreaming.value = true;
-  let idx = 0;
+  resetStream()
+  isStreaming.value = true
+  let idx = 0
   const tick = () => {
     // debugger
     if (idx >= fullStreamText.length) {
-      if (streamTimer) clearInterval(streamTimer);
-      isStreaming.value = false;
-      return;
+      if (streamTimer) clearInterval(streamTimer)
+      isStreaming.value = false
+      return
     }
-    streamBuffer.value += fullStreamText[idx++];
-  };
-  streamTimer = setInterval(tick, streamSpeed.value);
-};
+    streamBuffer.value += fullStreamText[idx++]
+  }
+  streamTimer = setInterval(tick, streamSpeed.value)
+}
 
 const resetStream = () => {
-  if (streamTimer) clearInterval(streamTimer);
-  streamBuffer.value = '';
-  streamMermaidSvgHtml.value = [];
-  streamMermaidRenderTask = null;
-  isStreaming.value = false;
-};
+  if (streamTimer) clearInterval(streamTimer)
+  streamBuffer.value = ''
+  streamMermaidSvgHtml.value = []
+  streamMermaidRenderTask = null
+  isStreaming.value = false
+}
 
 const refreshMermaid = async (root?: HTMLElement | null) => {
-  await nextTick();
-  await enhanceMarkdownContainer(root ?? mermaidContainer.value);
-};
+  await nextTick()
+  await enhanceMarkdownContainer(root ?? mermaidContainer.value)
+}
 
-onMounted(() => refreshMermaid());
+onMounted(() => refreshMermaid())
 
 watch(streamBuffer, () => {
-  void cacheStreamMermaidSvg();
-});
+  void cacheStreamMermaidSvg()
+})
 
 watch(streamHtml, () => {
-  nextTick(() => refreshMermaid(streamContainer.value));
-});
+  nextTick(() => refreshMermaid(streamContainer.value))
+})
 
-watch(isStreaming, (streaming) => {
+watch(isStreaming, streaming => {
   if (!streaming) {
-    void cacheStreamMermaidSvg().then(() => refreshMermaid(streamContainer.value));
+    void cacheStreamMermaidSvg().then(() =>
+      refreshMermaid(streamContainer.value)
+    )
   }
-});
+})
 
-let customMermaidTimer: ReturnType<typeof setTimeout> | null = null;
-const COMPLETE_MERMAID_RE = /```mermaid[\s\S]*?```/;
+let customMermaidTimer: ReturnType<typeof setTimeout> | null = null
+const COMPLETE_MERMAID_RE = /```mermaid[\s\S]*?```/
 
 watch(customInput, () => {
-  if (!COMPLETE_MERMAID_RE.test(customInput.value)) return;
-  if (customMermaidTimer) clearTimeout(customMermaidTimer);
+  if (!COMPLETE_MERMAID_RE.test(customInput.value)) return
+  if (customMermaidTimer) clearTimeout(customMermaidTimer)
   customMermaidTimer = setTimeout(() => {
-    customMermaidTimer = null;
-    void refreshMermaid(customContainer.value);
-  }, 200);
-});
+    customMermaidTimer = null
+    void refreshMermaid(customContainer.value)
+  }, 200)
+})
 </script>
 
 <style lang="less" scoped>
@@ -642,7 +687,7 @@ watch(customInput, () => {
   align-items: center;
   gap: 6px;
 
-  input[type="range"] {
+  input[type='range'] {
     width: 120px;
   }
 }
