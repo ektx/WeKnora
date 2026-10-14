@@ -64,6 +64,15 @@
       </div>
     </section>
 
+    <!-- customization -->
+    <section class="test-section">
+      <h2>Customization</h2>
+      <p>这是一个自定义的节点，支持标题与内容的展示。还可以设置控制按钮与后台进行数据交互。</p>
+      <div class="test-case">
+        <div ref="mermaidContainer" class="test-rendered markdown-content" v-html="customNodeHtml"></div>
+      </div>
+    </section>
+
     <!-- Streaming Simulation -->
     <section class="test-section">
       <h2>Streaming Simulation</h2>
@@ -73,7 +82,7 @@
         <button @click="resetStream" class="btn">Reset</button>
         <label class="speed-label">
           Speed:
-          <input type="range" min="10" max="200" v-model.number="streamSpeed" />
+          <input type="range" min="10" max="20000" v-model.number="streamSpeed" />
           {{ streamSpeed }}ms
         </label>
       </div>
@@ -285,6 +294,16 @@ graph TD
 \`\`\`
 `;
 
+
+const customNodeSample = `::: control
+title: 自定义节点
+subtitle: 通过自定义节点类型和样式
+btn(value1): 确认
+btn(value2): 取消
+btn(value3): 关闭
+:::
+`;
+
 // --- Streaming Simulation ---
 const fullStreamText = `
 好的，以下是根据知识库中**《xxx》学程手册**整理的有关XXX的介绍：
@@ -410,6 +429,14 @@ sequenceDiagram
     Note right of Cloud: 用于事故定责与算法优化
 \`\`\`
 
+::: control
+title: 自定义节点
+subtitle: 通过自定义节点类型和样式
+btn(value1): 确认
+btn(value2): 取消
+btn(value3): 关闭
+:::
+
 Done.`;
 
 const streamBuffer = ref('');
@@ -430,6 +457,7 @@ const tableHtml = render(tableSample);
 const listsHtml = render(listsSample);
 const mixedHtml = render(mixedSample);
 const mermaidHtml = render(mermaidSample);
+const customNodeHtml = render(customNodeSample)
 
 const streamHtml = computed(() => renderStreamMarkdown(streamBuffer.value));
 const customHtml = computed(() => render(customInput.value));
@@ -462,6 +490,7 @@ const startStream = () => {
   isStreaming.value = true;
   let idx = 0;
   const tick = () => {
+    // debugger
     if (idx >= fullStreamText.length) {
       if (streamTimer) clearInterval(streamTimer);
       isStreaming.value = false;
