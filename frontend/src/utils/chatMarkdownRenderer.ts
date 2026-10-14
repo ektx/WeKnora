@@ -1,6 +1,7 @@
 import { marked, type Renderer } from 'marked'
 import markedKatex from 'marked-katex-extension'
 import type { Tokens } from 'marked'
+import { customComponentExtension } from './marked/customComponentExt'
 
 import type { CachedMermaidSvgHtml } from './mermaidStreaming.ts'
 import { ensureLiteralSingleTildeOnGlobalMarked } from './markedLiteralTilde.ts'
@@ -13,7 +14,7 @@ import {
   restoreCitationHtmlPlaceholders,
   restoreCitationTags,
   stripIncompleteCitationTag,
-  type CitationKnowledgeRef,
+  type CitationKnowledgeRef
 } from './citationMarkdown.ts'
 
 const STREAMING_IMAGE_PLACEHOLDER =
@@ -43,8 +44,14 @@ export type RenderChatMarkdownOptions = {
   collapseStandaloneCitations?: boolean
   knowledgeReferences?: CitationKnowledgeRef[] | null
   cachedMermaidSvgHtml?: CachedMermaidSvgHtml
-  injectCachedMermaidSvg?: (html: string, cachedSvgHtml?: CachedMermaidSvgHtml) => string
-  prepareMarkdown?: (markdown: string, cachedSvgHtml?: CachedMermaidSvgHtml) => string
+  injectCachedMermaidSvg?: (
+    html: string,
+    cachedSvgHtml?: CachedMermaidSvgHtml
+  ) => string
+  prepareMarkdown?: (
+    markdown: string,
+    cachedSvgHtml?: CachedMermaidSvgHtml
+  ) => string
 }
 
 export function configureMarkedForChatMarkdown(): void {
@@ -52,6 +59,8 @@ export function configureMarkedForChatMarkdown(): void {
   marked.use({ breaks: true, gfm: true })
   ensureLiteralSingleTildeOnGlobalMarked()
   marked.use(markedKatex({ throwOnError: false, nonStandard: true }))
+  // 自定义扩展
+  marked.use({ extensions: [customComponentExtension] })
   markedConfigured = true
 }
 
@@ -88,11 +97,15 @@ const LEGACY_IMAGE_ORIGINAL_RE = /<image_original>([\s\S]*?)<\/image_original>/i
 const LEGACY_IMAGE_CAPTION_RE = /<image_caption>([\s\S]*?)<\/image_caption>/i
 const LEGACY_IMAGE_OCR_RE = /<image_ocr>([\s\S]*?)<\/image_ocr>/i
 const COMPLETE_MARKDOWN_CODE_RE = /(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)/g
-const IMAGE_URL_SCHEME = '(?:https?|resource|storage|local|minio|s3|cos|tos|oss|obs|ks3)'
-const FULLWIDTH_IMAGE_OPEN_RE = new RegExp(`(!\\[[^\\]\\n]*\\])（(?=${IMAGE_URL_SCHEME}://)`, 'gi')
+const IMAGE_URL_SCHEME =
+  '(?:https?|resource|storage|local|minio|s3|cos|tos|oss|obs|ks3)'
+const FULLWIDTH_IMAGE_OPEN_RE = new RegExp(
+  `(!\\[[^\\]\\n]*\\])（(?=${IMAGE_URL_SCHEME}://)`,
+  'gi'
+)
 const FULLWIDTH_IMAGE_CLOSE_RE = new RegExp(
   `(!\\[[^\\]\\n]*\\]\\(${IMAGE_URL_SCHEME}://[^）\\n]*?)）`,
-  'gi',
+  'gi'
 )
 
 /**
@@ -104,8 +117,11 @@ const FULLWIDTH_IMAGE_CLOSE_RE = new RegExp(
  * Normalizing an opening parenthesis before the closing one streams in also
  * lets the existing incomplete-image skeleton suppress the unstable tail.
  */
-export function normalizeFullwidthMarkdownImageParentheses(content: string): string {
-  if (!content || (!content.includes('（') && !content.includes('）'))) return content
+export function normalizeFullwidthMarkdownImageParentheses(
+  content: string
+): string {
+  if (!content || (!content.includes('（') && !content.includes('）')))
+    return content
 
   const parts = content.split(COMPLETE_MARKDOWN_CODE_RE)
   for (let i = 0; i < parts.length; i += 2) {
@@ -118,11 +134,17 @@ export function normalizeFullwidthMarkdownImageParentheses(content: string): str
 
 function legacyImageField(body: string, pattern: RegExp): string {
   const value = body.match(pattern)?.[1] || ''
-  return value.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
+  return value
+    .replace(/<[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function escapeMarkdownImageAlt(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/\[/g, '\\[').replace(/\]/g, '\\]')
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/\[/g, '\\[')
+    .replace(/\]/g, '\\]')
 }
 
 function legacyImageBlockToMarkdown(attributes: string, body: string): string {
@@ -143,7 +165,8 @@ function normalizeLegacyImageSegment(content: string): string {
   return content
     .replace(
       LEGACY_IMAGE_BLOCK_RE,
-      (_match, attributes: string, body: string) => legacyImageBlockToMarkdown(attributes, body),
+      (_match, attributes: string, body: string) =>
+        legacyImageBlockToMarkdown(attributes, body)
     )
     .replace(LEGACY_IMAGES_WRAPPER_RE, '')
 }
@@ -158,10 +181,14 @@ function normalizeLegacyImageSegment(content: string): string {
  * is still streaming, its unfinished tail is replaced by the existing image
  * skeleton so internal tags, captions, and OCR never flash as prose.
  */
-export function normalizeLegacyImageContextMarkup(content: string, streaming = false): string {
+export function normalizeLegacyImageContextMarkup(
+  content: string,
+  streaming = false
+): string {
   if (!content) return content
   const hasLegacyImageTag = /<\/?images?\b/i.test(content)
-  const partialTagPattern = /(^|\n)[ \t]*<i(?:m(?:a(?:g(?:e(?:[ \t][^>\n]*)?)?)?)?)?$/i
+  const partialTagPattern =
+    /(^|\n)[ \t]*<i(?:m(?:a(?:g(?:e(?:[ \t][^>\n]*)?)?)?)?)?$/i
   const hasPartialStreamingTag = streaming && partialTagPattern.test(content)
   if (!hasLegacyImageTag && !hasPartialStreamingTag) return content
 
@@ -199,12 +226,12 @@ export function stripTrailingStreamingHorizontalRule(content: string): string {
   if (!content) return content
   return content.replace(
     /(^|\n)[ \t]{0,3}(?:(?:-[ \t]*){3,}|(?:\*[ \t]*){3,}|(?:_[ \t]*){3,})$/,
-    '$1',
+    '$1'
   )
 }
 
 function maskMatches(text: string, regex: RegExp): string {
-  return text.replace(regex, (match) => match.replace(/[^\n]/g, '\u0000'))
+  return text.replace(regex, match => match.replace(/[^\n]/g, '\u0000'))
 }
 
 function isOdd(text: string, marker: RegExp): boolean {
@@ -239,14 +266,16 @@ export function closeDanglingStreamingEmphasis(text: string): string {
   let masked = maskMatches(text, /```[\s\S]*?```/g)
   if (isOdd(masked, /```/g)) {
     const open = masked.lastIndexOf('```')
-    masked = masked.slice(0, open) + masked.slice(open).replace(/[^\n]/g, '\u0000')
+    masked =
+      masked.slice(0, open) + masked.slice(open).replace(/[^\n]/g, '\u0000')
   }
   masked = maskMatches(masked, /`[^`\n]*`/g)
   let appendInlineCode = false
   if (isOdd(masked, /`/g)) {
     appendInlineCode = true
     const open = masked.lastIndexOf('`')
-    masked = masked.slice(0, open) + masked.slice(open).replace(/[^\n]/g, '\u0000')
+    masked =
+      masked.slice(0, open) + masked.slice(open).replace(/[^\n]/g, '\u0000')
   }
 
   // Drop a trailing emphasis-marker run with no content after it: ambiguous and
@@ -261,7 +290,10 @@ export function closeDanglingStreamingEmphasis(text: string): string {
   }
 
   // Leading list/bullet markers are structure, not emphasis.
-  masked = masked.replace(/^(\s*)([*+-])(\s)/gm, (_m, p1, _p2, p3) => `${p1}\u0000${p3}`)
+  masked = masked.replace(
+    /^(\s*)([*+-])(\s)/gm,
+    (_m, p1, _p2, p3) => `${p1}\u0000${p3}`
+  )
 
   const needStrike = isOdd(masked, /~~/g)
   const withoutBold = maskMatches(masked, /\*\*/g)
@@ -288,7 +320,8 @@ export function closeDanglingStreamingEmphasis(text: string): string {
 
 const FLANKING_BOLD = /(?<!\*)\*\*(?=\S)([^*\n]*?\p{P})\*\*(?=[\p{L}\p{N}])/gu
 const FLANKING_STRIKE = /(?<!~)~~(?=\S)([^~\n]*?\p{P})~~(?=[\p{L}\p{N}])/gu
-const FLANKING_ITALIC = /(?<![*\p{L}\p{N}])\*(?=\S)([^*\n]*?\p{P})\*(?=[\p{L}\p{N}])/gu
+const FLANKING_ITALIC =
+  /(?<![*\p{L}\p{N}])\*(?=\S)([^*\n]*?\p{P})\*(?=[\p{L}\p{N}])/gu
 
 // Opening-delimiter variant of the rule above. CommonMark also refuses to *open*
 // emphasis when the run is preceded by a letter/number and immediately followed
@@ -347,7 +380,10 @@ export function repairFlankingEmphasis(text: string): string {
  */
 export function stripTrailingStreamingListMarker(text: string): string {
   if (!text) return text
-  return text.replace(/(^|\n)[ \t]*(?:[-*+]|[-=]{2,}|\d{1,9}[.)]?)[ \t]*$/, '$1')
+  return text.replace(
+    /(^|\n)[ \t]*(?:[-*+]|[-=]{2,}|\d{1,9}[.)]?)[ \t]*$/,
+    '$1'
+  )
 }
 
 const TAIL_TEXT_RE = />([^<>]+)</g
@@ -390,7 +426,9 @@ export function applyStreamingTailFade(html: string, tailLength = 24): string {
   return html.slice(0, textStart) + wrapped + html.slice(textEnd)
 }
 
-export function createChatMarkdownRenderer(options: ChatMarkdownRendererOptions = {}): Renderer {
+export function createChatMarkdownRenderer(
+  options: ChatMarkdownRendererOptions = {}
+): Renderer {
   const renderer = new marked.Renderer()
 
   if (options.imageRenderer) {
@@ -400,11 +438,13 @@ export function createChatMarkdownRenderer(options: ChatMarkdownRendererOptions 
       if (options.isValidImageUrl && !options.isValidImageUrl(imageHref)) {
         return options.invalidImageHtml?.(imageHref) ?? ''
       }
-      return options.imageRenderer?.({
-        href: imageHref,
-        title: title || null,
-        text: text || '',
-      }) ?? ''
+      return (
+        options.imageRenderer?.({
+          href: imageHref,
+          title: title || null,
+          text: text || ''
+        }) ?? ''
+      )
     }
   }
 
@@ -415,11 +455,18 @@ export function createChatMarkdownRenderer(options: ChatMarkdownRendererOptions 
   return renderer
 }
 
+/**
+ * 这是渲染后的 HTML 后处理，而不是 marked 的解析扩展。它做的事情很简单：
+ * - 检测：如果 HTML 里没有 <table 就直接返回，不做无谓的处理。
+ * - 包裹：用正则匹配出每一整个 <table>...</table> 块，给它外面套一层 <div class="chat-markdown-table">。
+ * @param html
+ * @returns
+ */
 export function wrapChatMarkdownTables(html: string): string {
   if (!html || !html.includes('<table')) return html
   return html.replace(
     /<table\b[\s\S]*?<\/table>/gi,
-    (tableHtml) => `<div class="chat-markdown-table">${tableHtml}</div>`,
+    tableHtml => `<div class="chat-markdown-table">${tableHtml}</div>`
   )
 }
 
@@ -450,26 +497,36 @@ export function markStandaloneStrongParagraphs(html: string): string {
       // the list's own (zero) margins.
       if (/<li>\s*$/.test(full.slice(0, offset))) return match
       return `<p class="md-strong-title"><strong>${inner}</strong></p>`
-    },
+    }
   )
 }
 
-export function renderChatMarkdown(rawMarkdown: unknown, options: RenderChatMarkdownOptions): string {
-  const rawText = typeof rawMarkdown === 'string' ? rawMarkdown : String(rawMarkdown || '')
+export function renderChatMarkdown(
+  rawMarkdown: unknown,
+  options: RenderChatMarkdownOptions
+): string {
+  const rawText =
+    typeof rawMarkdown === 'string' ? rawMarkdown : String(rawMarkdown || '')
   if (!rawText.trim()) return ''
+  debugger
+  console.log('>', options.streaming)
+  console.log('renderChatMarkdown', rawText)
 
   configureMarkedForChatMarkdown()
 
   const streamingSafeText = options.streaming
-    ? stripTrailingStreamingListMarker(stripTrailingStreamingHorizontalRule(rawText))
+    ? stripTrailingStreamingListMarker(
+        stripTrailingStreamingHorizontalRule(rawText)
+      )
     : rawText
   const imageContextSafeText = normalizeLegacyImageContextMarkup(
     streamingSafeText,
-    Boolean(options.streaming),
+    Boolean(options.streaming)
   )
   const citationSafeText = stripIncompleteCitationTag(imageContextSafeText)
   const { text: tagSafe, tags } = preserveCitationTags(citationSafeText)
-  const normalizedImageMarkdown = normalizeFullwidthMarkdownImageParentheses(tagSafe)
+  const normalizedImageMarkdown =
+    normalizeFullwidthMarkdownImageParentheses(tagSafe)
   // Skill-generated file names routinely contain spaces and parentheses, which
   // marked would split the destination on. Collapse each reference into a
   // single token before parsing.
@@ -483,7 +540,9 @@ export function renderChatMarkdown(rawMarkdown: unknown, options: RenderChatMark
   // bare `   - `, which would otherwise flash an empty nested item under the
   // previous line right as the next item starts streaming.
   const balancedInline = options.streaming
-    ? stripTrailingStreamingListMarker(closeDanglingStreamingEmphasis(inlineTags))
+    ? stripTrailingStreamingListMarker(
+        closeDanglingStreamingEmphasis(inlineTags)
+      )
     : inlineTags
   const preparedMarkdown = options.prepareMarkdown
     ? options.prepareMarkdown(balancedInline, options.cachedMermaidSvgHtml)
@@ -492,22 +551,28 @@ export function renderChatMarkdown(rawMarkdown: unknown, options: RenderChatMark
   // Convert <kb>/<web>/wiki tags to HTML placeholders before escapeMarkdown so
   // agent sanitizers (e.g. UUID stripping) cannot damage chunk_id attributes.
   const { content: markdownWithPlaceholders, htmlSnippets } =
-    extractCitationHtmlPlaceholders(flankingSafeMarkdown, options.knowledgeReferences)
+    extractCitationHtmlPlaceholders(
+      flankingSafeMarkdown,
+      options.knowledgeReferences
+    )
   const escapedMarkdown = options.escapeMarkdown(markdownWithPlaceholders)
   const html = marked.parse(markdownWithPlaceholders, {
     renderer: options.renderer,
     breaks: true,
-    async: false,
+    async: false
   }) as string
   const restoredHtml = restoreCitationHtmlPlaceholders(html, htmlSnippets)
-  const citationHtml = options.collapseStandaloneCitations === false
-    ? restoredHtml
-    : collapseStandaloneCitationParagraphs(restoredHtml)
+  const citationHtml =
+    options.collapseStandaloneCitations === false
+      ? restoredHtml
+      : collapseStandaloneCitationParagraphs(restoredHtml)
   const tableWrappedHtml = wrapChatMarkdownTables(citationHtml)
   const strongTitleHtml = markStandaloneStrongParagraphs(tableWrappedHtml)
   const sanitized = options.sanitizeHtml(strongTitleHtml)
   const withMermaid = options.injectCachedMermaidSvg
     ? options.injectCachedMermaidSvg(sanitized, options.cachedMermaidSvgHtml)
     : sanitized
+
+  console.log('renderChatMarkdown result', withMermaid)
   return options.streaming ? applyStreamingTailFade(withMermaid) : withMermaid
 }
