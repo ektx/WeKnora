@@ -2,8 +2,17 @@ import { applyFinalArtifactContent } from '@/utils/finalArtifactContent'
 import { markRaw, nextTick, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ensureRagPipelineHistoryStream } from '@/utils/rag-pipeline-history'
-import { applyMessageCreatedAt, bindServerTurnTimestamps, ensureMessageCreatedAt } from '@/utils/messageTimestamp'
-import { expandSteerForksInHistory, forkAfterInjectedUser, steerStepEvents, resetSteerTurnForReplay } from '@/utils/steerStreamFork'
+import {
+  applyMessageCreatedAt,
+  bindServerTurnTimestamps,
+  ensureMessageCreatedAt
+} from '@/utils/messageTimestamp'
+import {
+  expandSteerForksInHistory,
+  forkAfterInjectedUser,
+  steerStepEvents,
+  resetSteerTurnForReplay
+} from '@/utils/steerStreamFork'
 
 export type ChatMessage = Record<string, unknown>
 
@@ -26,7 +35,7 @@ export interface UseChatStreamHandlerOptions {
   onAgentQuery?: (
     data: ChatMessage,
     existingMessage: ChatMessage | undefined,
-    created: boolean,
+    created: boolean
   ) => void
   onMessageCreated?: (message: ChatMessage) => void
   onMessageUpdated?: (message: ChatMessage, payload?: ChatMessage) => void
@@ -38,7 +47,10 @@ export interface UseChatStreamHandlerOptions {
   debug?: boolean
 }
 
-function mergeToolCallArguments(previous: unknown, incoming: unknown): Record<string, unknown> {
+function mergeToolCallArguments(
+  previous: unknown,
+  incoming: unknown
+): Record<string, unknown> {
   const prev =
     previous && typeof previous === 'object' && !Array.isArray(previous)
       ? (previous as Record<string, unknown>)
@@ -74,7 +86,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
     onAgentChunkBound,
     onUserMessageInjected,
     onGenerationStopped,
-    debug = false,
+    debug = false
   } = options
 
   const emitMessageCreated = (message: ChatMessage) => {
@@ -114,11 +126,11 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
     if (message.isAgentMode) {
       if (!message.agentEventStream) message.agentEventStream = []
       const stream = message.agentEventStream as ChatMessage[]
-      if (!stream.some((e) => e.type === 'stop')) {
+      if (!stream.some(e => e.type === 'stop')) {
         stream.push({
           type: 'stop',
           timestamp: Date.now(),
-          reason: 'user_requested',
+          reason: 'user_requested'
         })
       }
     }
@@ -140,12 +152,12 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
     let target: ChatMessage | undefined
     if (messageId) {
       target = messagesList.find(
-        (m) =>
+        m =>
           m.role === 'assistant' &&
           !m.is_completed &&
           (m.id === messageId ||
             m.assistant_message_id === messageId ||
-            m.request_id === messageId),
+            m.request_id === messageId)
       )
     }
     if (!target) target = getTrailingIncompleteAssistant()
@@ -175,10 +187,15 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
 
     if (dataId && replaySegments.has(dataId)) return replaySegments.get(dataId)
 
-    const matched = findLastMessage((item) => {
+    const matched = findLastMessage(item => {
       if (item.role !== 'assistant') return false
-      if (dataId && (item.request_id === dataId || item.id === dataId)) return true
-      if (assistantId && (item.id === assistantId || item.request_id === assistantId)) return true
+      if (dataId && (item.request_id === dataId || item.id === dataId))
+        return true
+      if (
+        assistantId &&
+        (item.id === assistantId || item.request_id === assistantId)
+      )
+        return true
       return false
     })
     if (matched) return matched
@@ -193,7 +210,8 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
     let message = resolveActiveAssistantMessage(data)
     const created = !message
     if (!message) {
-      const rowId = (data.id as string | undefined) || currentAssistantMessageId.value
+      const rowId =
+        (data.id as string | undefined) || currentAssistantMessageId.value
       message = {
         id: rowId,
         request_id: rowId,
@@ -203,7 +221,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
         thinkContent: '',
         thinking: false,
         is_completed: false,
-        knowledge_references: [],
+        knowledge_references: []
       }
       ensureAgentMessageShell(message, data.id as string | undefined)
       messagesList.push(message)
@@ -240,7 +258,10 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
     return message
   }
 
-  const ensureAgentMessageShell = (message: ChatMessage, requestId?: string) => {
+  const ensureAgentMessageShell = (
+    message: ChatMessage,
+    requestId?: string
+  ) => {
     if (message.role === 'user') return
     message.isAgentMode = true
     if (!isAgentStreamSession()) {
@@ -260,24 +281,32 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
     if (!session.is_completed) return true
     const stream = session.agentEventStream
     if (Array.isArray(stream) && stream.length > 0) return true
-    if (Array.isArray(session.knowledge_references) && session.knowledge_references.length > 0) {
+    if (
+      Array.isArray(session.knowledge_references) &&
+      session.knowledge_references.length > 0
+    ) {
       return true
     }
     // A turn can carry its answer as plain content with no timeline events —
     // most visibly after a steer fork, where the events are split across
     // segments and one segment can end up holding only the answer text.
     // Hiding that row loses the reply entirely on reload.
-    if (typeof session.content === 'string' && session.content.trim()) return true
+    if (typeof session.content === 'string' && session.content.trim())
+      return true
     return false
   }
 
   const shouldShowGlobalTypingIndicator = (
     messages: ChatMessage[],
     isLoading: boolean,
-    isRecovering = false,
+    isRecovering = false
   ) => {
     if (!isLoading && !isRecovering) return false
-    if (messages.some((m) => m.role === 'assistant' && m.isAgentMode && !m.is_completed)) {
+    if (
+      messages.some(
+        m => m.role === 'assistant' && m.isAgentMode && !m.is_completed
+      )
+    ) {
       return false
     }
     return true
@@ -295,18 +324,22 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       item.isAgentMode = true
       item.hideContent = true
     }
-    ensureRagPipelineHistoryStream(item as Parameters<typeof ensureRagPipelineHistoryStream>[0])
+    ensureRagPipelineHistoryStream(
+      item as Parameters<typeof ensureRagPipelineHistoryStream>[0]
+    )
     if (item.isRagMode && item.agentEventStream) {
       item.agentEventStream = markRaw(item.agentEventStream as object)
     }
   }
 
   const recomposeAgentAnswer = (message: ChatMessage) => {
-    const stream = message.agentEventStream as Array<{
-      type?: string
-      superseded?: boolean
-      content?: string
-    }> | undefined
+    const stream = message.agentEventStream as
+      | Array<{
+          type?: string
+          superseded?: boolean
+          content?: string
+        }>
+      | undefined
     if (!stream) return ''
     let out = ''
     for (const e of stream) {
@@ -319,7 +352,9 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
 
   const agentStepsAreTruncated = (agentSteps: unknown[] | undefined) =>
     Array.isArray(agentSteps) &&
-    agentSteps.some((step) => (step as ChatMessage | undefined)?.truncated === true)
+    agentSteps.some(
+      step => (step as ChatMessage | undefined)?.truncated === true
+    )
 
   const reconstructEventStreamFromSteps = (
     agentSteps: unknown[],
@@ -327,17 +362,20 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
     isCompleted = false,
     isFallback = false,
     agentDurationMs = 0,
-    usage?: unknown,
+    usage?: unknown
   ) => {
     const events: ChatMessage[] = []
 
     if (agentSteps && Array.isArray(agentSteps) && agentSteps.length > 0) {
-      agentSteps.forEach((rawStep) => {
+      agentSteps.forEach(rawStep => {
         const step = rawStep as ChatMessage
         events.push(...steerStepEvents(step))
-        const stepTimestamp = step.timestamp ? new Date(String(step.timestamp)).getTime() : 0
+        const stepTimestamp = step.timestamp
+          ? new Date(String(step.timestamp)).getTime()
+          : 0
         const toolCalls = step.tool_calls
-        const hasToolCalls = toolCalls && Array.isArray(toolCalls) && toolCalls.length > 0
+        const hasToolCalls =
+          toolCalls && Array.isArray(toolCalls) && toolCalls.length > 0
 
         const reasoningText =
           step.reasoning_content && String(step.reasoning_content).trim()
@@ -351,13 +389,22 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
             done: true,
             thinking: false,
             timestamp: stepTimestamp || undefined,
-            duration_ms: step.duration || undefined,
+            duration_ms: step.duration || undefined
           })
         }
-        const preambleText = step.thought && String(step.thought).trim() ? String(step.thought) : ''
+        const preambleText =
+          step.thought && String(step.thought).trim()
+            ? String(step.thought)
+            : ''
         if (preambleText && step.intermediate_answer) {
-          events.push({ type: 'answer', event_id: `step-${step.iteration}-answer`,
-            content: preambleText, done: true, intermediate_answer: true, timestamp: stepTimestamp || undefined })
+          events.push({
+            type: 'answer',
+            event_id: `step-${step.iteration}-answer`,
+            content: preambleText,
+            done: true,
+            intermediate_answer: true,
+            timestamp: stepTimestamp || undefined
+          })
         }
         if (preambleText && hasToolCalls) {
           events.push({
@@ -366,7 +413,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
             content: preambleText,
             done: true,
             superseded: true,
-            timestamp: stepTimestamp || undefined,
+            timestamp: stepTimestamp || undefined
           })
         }
 
@@ -389,7 +436,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
               duration: toolCall.duration,
               duration_ms: toolCall.duration,
               display_type: resultData?.display_type,
-              tool_data: result?.data,
+              tool_data: result?.data
             })
           })
         }
@@ -400,7 +447,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       events.push({
         type: 'agent_complete',
         total_duration_ms: agentDurationMs,
-        usage,
+        usage
       })
     }
 
@@ -408,7 +455,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       const answerEvent: ChatMessage = {
         type: 'answer',
         content: messageContent,
-        done: true,
+        done: true
       }
       if (isFallback) answerEvent.is_fallback = true
       // A round the completion cap cut off marks its step. Live streaming
@@ -421,20 +468,26 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       events.push({
         type: 'stop',
         timestamp: Date.now(),
-        reason: 'user_requested',
+        reason: 'user_requested'
       })
     }
 
     return events
   }
 
+  /**
+   * 收到返回的回答内容列表
+   * @param data
+   * @param isScrollType
+   * @param newScrollHeight
+   */
   const handleMsgList = async (
     data: ChatMessage[],
     isScrollType = false,
-    newScrollHeight?: number,
+    newScrollHeight?: number
   ) => {
     const chatlist = [...data]
-    const existingIds = new Set(messagesList.map((m) => m.id).filter(Boolean))
+    const existingIds = new Set(messagesList.map(m => m.id).filter(Boolean))
     const processed: ChatMessage[] = []
 
     for (const raw of chatlist) {
@@ -443,19 +496,28 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       if (item.id) existingIds.add(item.id)
 
       item.isAgentMode = false
-      const willContinueStream = preserveIncompleteStreamReactive && !item.is_completed
+      const willContinueStream =
+        preserveIncompleteStreamReactive && !item.is_completed
       if (willContinueStream) {
         item.agentEventStream = item.agentEventStream || []
         item._eventMap = new Map()
         item._pendingToolCalls = new Map()
       } else {
-        item.agent_steps = item.agent_steps ? markRaw(item.agent_steps as object) : item.agent_steps
-        item.agentEventStream = markRaw((item.agentEventStream as unknown[]) || [])
+        item.agent_steps = item.agent_steps
+          ? markRaw(item.agent_steps as object)
+          : item.agent_steps
+        item.agentEventStream = markRaw(
+          (item.agentEventStream as unknown[]) || []
+        )
         item._eventMap = markRaw(new Map())
         item._pendingToolCalls = markRaw(new Map())
       }
 
-      if (item.agent_steps && Array.isArray(item.agent_steps) && item.agent_steps.length > 0) {
+      if (
+        item.agent_steps &&
+        Array.isArray(item.agent_steps) &&
+        item.agent_steps.length > 0
+      ) {
         item.isAgentMode = true
         item.agentEventStream = markRaw(
           reconstructEventStreamFromSteps(
@@ -464,11 +526,12 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
             Boolean(item.is_completed),
             Boolean(item.is_fallback),
             Number(item.agent_duration_ms) || 0,
-            item.usage,
-          ),
+            item.usage
+          )
         )
         item.hideContent = true
-        if (agentStepsAreTruncated(item.agent_steps as unknown[])) item.truncated = true
+        if (agentStepsAreTruncated(item.agent_steps as unknown[]))
+          item.truncated = true
       }
 
       restoreQuickAnswerFlags(item)
@@ -484,7 +547,11 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
           item.showThink = true
           item.thinking = false
           const index = content.trim().lastIndexOf(thinkCloseTag)
-          item.thinkContent = content.trim().substring(0, index).replace('<think>', '').trim()
+          item.thinkContent = content
+            .trim()
+            .substring(0, index)
+            .replace('<think>', '')
+            .trim()
           item.content = content.trim().substring(index + thinkCloseTag.length)
         } else if (content.includes('<think>')) {
           item.showThink = true
@@ -511,7 +578,11 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
 
     if (isFirstEnter?.value) {
       scrollToBottom(true)
-    } else if (isScrollType && scrollContainer?.value && typeof newScrollHeight === 'number') {
+    } else if (
+      isScrollType &&
+      scrollContainer?.value &&
+      typeof newScrollHeight === 'number'
+    ) {
       nextTick(() => {
         if (!scrollContainer.value) return
         const { scrollHeight } = scrollContainer.value
@@ -525,7 +596,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
   }
 
   const updateAssistantSession = (payload: ChatMessage) => {
-    const message = findLastMessage((item) => {
+    const message = findLastMessage(item => {
       if (item.role !== 'assistant') return false
       if (item.request_id === payload.id) return true
       return item.id === payload.id
@@ -577,7 +648,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
         isRagMode: !isAgentStreamSession(),
         agentEventStream: [],
         _eventMap: new Map(),
-        knowledge_references: [],
+        knowledge_references: []
       }
       messagesList.push(newMsg)
       emitMessageCreated(newMsg)
@@ -616,7 +687,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
         log('[Thinking Event]', {
           event_id: eventId,
           done: data.done,
-          content_length: (data.content as string | undefined)?.length || 0,
+          content_length: (data.content as string | undefined)?.length || 0
         })
         if (!message.agentEventStream) message.agentEventStream = []
         if (!message._eventMap) message._eventMap = new Map()
@@ -633,14 +704,21 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
               content: '',
               done: false,
               startTime: Date.now(),
-              thinking: true,
+              thinking: true
             }
             stream.push(thinkingEvent)
             if (eventId) eventMap.set(eventId, thinkingEvent)
           }
           if (data.content) {
-            thinkingEvent.content = String(thinkingEvent.content || '') + String(data.content)
-            log('[Thinking] Event', eventId, 'accumulated:', String(thinkingEvent.content).length, 'chars')
+            thinkingEvent.content =
+              String(thinkingEvent.content || '') + String(data.content)
+            log(
+              '[Thinking] Event',
+              eventId,
+              'accumulated:',
+              String(thinkingEvent.content).length,
+              'chars'
+            )
           }
         } else {
           const thinkingEvent = eventMap.get(eventId || '')
@@ -648,11 +726,19 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
             thinkingEvent.done = true
             thinkingEvent.thinking = false
             thinkingEvent.duration_ms =
-              dataPayload?.duration_ms || Date.now() - Number(thinkingEvent.startTime || Date.now())
+              dataPayload?.duration_ms ||
+              Date.now() - Number(thinkingEvent.startTime || Date.now())
             thinkingEvent.completed_at = dataPayload?.completed_at || Date.now()
-            log('[Thinking] Event completed, duration:', thinkingEvent.duration_ms, 'ms')
+            log(
+              '[Thinking] Event completed, duration:',
+              thinkingEvent.duration_ms,
+              'ms'
+            )
           } else {
-            console.warn('[Thinking] Received done for unknown event_id:', eventId)
+            console.warn(
+              '[Thinking] Received done for unknown event_id:',
+              eventId
+            )
           }
         }
         break
@@ -674,7 +760,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
           messages_after: d.messages_after,
           summary: d.summary,
           degraded: d.degraded,
-          split_turn: d.split_turn,
+          split_turn: d.split_turn
         })
         break
       }
@@ -691,15 +777,17 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
           timeout_seconds: d.timeout_seconds,
           requested_at: d.requested_at,
           tool_call_id: d.tool_call_id,
-          resolved: false,
+          resolved: false
         })
         break
       }
       case 'tool_approval_resolved': {
         const d = dataPayload || {}
         const pid = d.pending_id
-        const ev = (message.agentEventStream as ChatMessage[] | undefined)?.find(
-          (e) => e.type === 'tool_approval_required' && e.pending_id === pid,
+        const ev = (
+          message.agentEventStream as ChatMessage[] | undefined
+        )?.find(
+          e => e.type === 'tool_approval_required' && e.pending_id === pid
         )
         if (ev) {
           ev.resolved = true
@@ -722,7 +810,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
           timeout_seconds: d.timeout_seconds,
           requested_at: d.requested_at,
           tool_call_id: d.tool_call_id,
-          resolved: false,
+          resolved: false
         })
         break
       }
@@ -733,9 +821,12 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
         const list = message.agentEventStream as ChatMessage[] | undefined
         // Resolve the matching card; also clear any other still-pending cards
         // for the same service (parallel tool calls dedup to a single auth).
-        list?.forEach((e) => {
+        list?.forEach(e => {
           if (e.type !== 'mcp_oauth_required' || e.resolved) return
-          if (e.pending_id === pid || (sid && e.service_id === sid && d.authorized)) {
+          if (
+            e.pending_id === pid ||
+            (sid && e.service_id === sid && d.authorized)
+          ) {
             e.resolved = true
             e.authorized = d.authorized
             e.resolve_reason = d.reason
@@ -750,7 +841,12 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
         if (message.agentEventStream) {
           let retracted = false
           for (const ev of message.agentEventStream as ChatMessage[]) {
-            if (ev.type === 'answer' && !ev.superseded && ev.content && String(ev.content).trim()) {
+            if (
+              ev.type === 'answer' &&
+              !ev.superseded &&
+              ev.content &&
+              String(ev.content).trim()
+            ) {
               ev.superseded = true
               ev.done = true
               retracted = true
@@ -761,7 +857,10 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
             fullContent.value = String(message.content || '')
           }
         }
-        if (dataPayload && (dataPayload.tool_name || dataPayload.tool_call_id)) {
+        if (
+          dataPayload &&
+          (dataPayload.tool_name || dataPayload.tool_call_id)
+        ) {
           if (!message.agentEventStream) message.agentEventStream = []
           if (!message._pendingToolCalls) message._pendingToolCalls = new Map()
           const pending = message._pendingToolCalls as Map<string, ChatMessage>
@@ -772,25 +871,30 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
             (dataPayload.tool_call_id as string) ||
             (incomingToolName ? `${incomingToolName}_${Date.now()}` : null)
           if (!toolCallId) {
-            console.warn('[Tool Call] Received event without identifiable tool_call_id:', dataPayload)
+            console.warn(
+              '[Tool Call] Received event without identifiable tool_call_id:',
+              dataPayload
+            )
             break
           }
 
           log('[Tool Call]', {
             tool_call_id: toolCallId,
             tool_name: incomingToolName,
-            has_arguments: Boolean(incomingArguments),
+            has_arguments: Boolean(incomingArguments)
           })
 
           let toolCallEvent = pending.get(toolCallId)
           if (!toolCallEvent) {
             toolCallEvent = stream.find(
-              (event) => event.type === 'tool_call' && event.tool_call_id === toolCallId,
+              event =>
+                event.type === 'tool_call' && event.tool_call_id === toolCallId
             )
           }
           if (toolCallEvent) {
             const resolvedMcpTarget =
-              toolCallEvent.tool_name === 'call_mcp_tool' && incomingToolName?.startsWith('mcp_')
+              toolCallEvent.tool_name === 'call_mcp_tool' &&
+              incomingToolName?.startsWith('mcp_')
             if (incomingToolName) toolCallEvent.tool_name = incomingToolName
             if (incomingArguments) {
               if (resolvedMcpTarget) {
@@ -798,7 +902,10 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
                 // the streamed proxy envelope instead of mixing the two.
                 toolCallEvent.arguments = incomingArguments
               } else {
-                toolCallEvent.arguments = mergeToolCallArguments(toolCallEvent.arguments, incomingArguments)
+                toolCallEvent.arguments = mergeToolCallArguments(
+                  toolCallEvent.arguments,
+                  incomingArguments
+                )
               }
             }
             toolCallEvent.pending = true
@@ -811,7 +918,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
               tool_name: incomingToolName,
               arguments: incomingArguments,
               timestamp: Date.now(),
-              pending: true,
+              pending: true
             }
             stream.push(newToolCallEvent)
             pending.set(toolCallId, newToolCallEvent)
@@ -822,12 +929,19 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       case 'command_output': {
         const toolCallId = dataPayload?.tool_call_id as string | undefined
         if (!toolCallId) break
-        const tool = (message.agentEventStream as ChatMessage[] | undefined)?.find(
-          event => event.type === 'tool_call' && event.tool_call_id === toolCallId,
+        const tool = (
+          message.agentEventStream as ChatMessage[] | undefined
+        )?.find(
+          event =>
+            event.type === 'tool_call' && event.tool_call_id === toolCallId
         )
         // Late progress must not resurrect a completed command or attach to
         // another concurrent call just because it uses the same tool name.
-        if (tool?.pending && tool.tool_name === 'shell_exec' && !(tool.command_output as ChatMessage | undefined)?.done) {
+        if (
+          tool?.pending &&
+          tool.tool_name === 'shell_exec' &&
+          !(tool.command_output as ChatMessage | undefined)?.done
+        ) {
           tool.command_output = dataPayload
         }
         break
@@ -837,14 +951,17 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
         if (dataPayload) {
           const toolCallId = dataPayload.tool_call_id as string | undefined
           const toolName = dataPayload.tool_name as string | undefined
-          const success = responseType !== 'error' && dataPayload.success !== false
+          const success =
+            responseType !== 'error' && dataPayload.success !== false
           log('[Tool Result]', {
             tool_call_id: toolCallId,
             tool_name: toolName,
-            success,
+            success
           })
           let toolCallEvent: ChatMessage | undefined
-          const pending = message._pendingToolCalls as Map<string, ChatMessage> | undefined
+          const pending = message._pendingToolCalls as
+            | Map<string, ChatMessage>
+            | undefined
           if (pending) {
             if (toolCallId && pending.has(toolCallId)) {
               toolCallEvent = pending.get(toolCallId)
@@ -867,16 +984,23 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
             // "exited with code 1" plus a retry hint; the streams live on
             // output / tool_data and are what the terminal card should show.
             toolCallEvent.output = dataPayload.output || data.content
-            toolCallEvent.error = !success ? dataPayload.error || data.content : undefined
+            toolCallEvent.error = !success
+              ? dataPayload.error || data.content
+              : undefined
             const duration =
-              dataPayload.duration_ms !== undefined ? dataPayload.duration_ms : dataPayload.duration
+              dataPayload.duration_ms !== undefined
+                ? dataPayload.duration_ms
+                : dataPayload.duration
             toolCallEvent.duration = duration
             toolCallEvent.duration_ms = duration
             toolCallEvent.display_type = dataPayload.display_type
             toolCallEvent.tool_data = dataPayload
             log('[Tool Result] Updated event in stream')
           } else {
-            console.warn('[Tool Result] No pending tool call found for', toolCallId || toolName)
+            console.warn(
+              '[Tool Result] No pending tool call found for',
+              toolCallId || toolName
+            )
           }
           if (responseType === 'error' && !toolName) {
             const errorMsg = String(data.content || t('chat.processError'))
@@ -912,31 +1036,41 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
 
         let answerEvent = eventId
           ? eventMap.get(eventId)
-          : stream.find((e) => e.type === 'answer' && !e.event_id)
+          : stream.find(e => e.type === 'answer' && !e.event_id)
         if (!answerEvent) {
-          answerEvent = { type: 'answer', event_id: eventId, content: '', done: false }
+          answerEvent = {
+            type: 'answer',
+            event_id: eventId,
+            content: '',
+            done: false
+          }
           stream.push(answerEvent)
           if (eventId) eventMap.set(eventId, answerEvent)
         }
-        if (!answerEvent.content && message.content && String(message.content).trim()) {
+        if (
+          !answerEvent.content &&
+          message.content &&
+          String(message.content).trim()
+        ) {
           // Seeding exists for resume paths where message.content holds text no
           // stream event carries. When a live prior answer event exists, its
           // text is already counted by recomposeAgentAnswer, so seeding the new
           // event would duplicate every prior round on the next recompose.
           const hasLivePriorAnswer = stream.some(
-            (e) =>
+            e =>
               e !== answerEvent &&
               e.type === 'answer' &&
               !e.superseded &&
               e.content &&
-              String(e.content).trim(),
+              String(e.content).trim()
           )
           if (!hasLivePriorAnswer) {
             answerEvent.content = message.content
           }
         }
         if (data.content) {
-          answerEvent.content = String(answerEvent.content || '') + String(data.content)
+          answerEvent.content =
+            String(answerEvent.content || '') + String(data.content)
           message.content = recomposeAgentAnswer(message)
           fullContent.value = String(message.content || '')
         }
@@ -982,9 +1116,10 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
           // which point history has already loaded the persisted row. Reuse
           // it — synthesizing here would show the same message twice.
           injectedUser = messagesList.find(
-            (item) =>
+            item =>
               item.role === 'user' &&
-              ((!!injectedId && item.id === injectedId) || item.steer_id === steerId),
+              ((!!injectedId && item.id === injectedId) ||
+                item.steer_id === steerId)
           )
           alreadyInList = Boolean(injectedUser)
           if (!injectedUser) {
@@ -995,22 +1130,26 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
               content: String(dataPayload?.content || ''),
               steer_id: steerId,
               channel: 'web',
-              is_completed: true,
+              is_completed: true
             }
-            if (data.created_at) applyMessageCreatedAt(injectedUser, data.created_at)
+            if (data.created_at)
+              applyMessageCreatedAt(injectedUser, data.created_at)
           }
           if (injectedId) injectedUser.id = injectedId
-          if (data.created_at) applyMessageCreatedAt(injectedUser, data.created_at)
+          if (data.created_at)
+            applyMessageCreatedAt(injectedUser, data.created_at)
         }
         if (injectedUser) {
-          if (dataId && !injectedUser.request_id) injectedUser.request_id = dataId
+          if (dataId && !injectedUser.request_id)
+            injectedUser.request_id = dataId
           const continuation = forkAfterInjectedUser(
             messagesList,
             message,
             injectedUser,
-            steerId,
+            steerId
           )
-          if (dataId && replaySegments.has(dataId)) replaySegments.set(dataId, continuation)
+          if (dataId && replaySegments.has(dataId))
+            replaySegments.set(dataId, continuation)
           if (!alreadyInList) emitMessageCreated(injectedUser)
           if (continuation !== message) {
             emitMessageCreated(continuation)
@@ -1051,7 +1190,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
             type: 'agent_complete',
             total_duration_ms: dataPayload?.total_duration_ms || 0,
             total_steps: dataPayload?.total_steps || 0,
-            usage,
+            usage
           })
         }
         break
@@ -1062,7 +1201,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
         ;(message.agentEventStream as ChatMessage[]).push({
           type: 'stop',
           timestamp: Date.now(),
-          reason: dataPayload?.reason || 'user_requested',
+          reason: dataPayload?.reason || 'user_requested'
         })
         message.is_completed = true
         loading.value = false
@@ -1083,15 +1222,20 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       id: data.id,
       done: data.done,
       content_length: (data.content as string | undefined)?.length || 0,
-      content_preview: data.content ? String(data.content).substring(0, 50) : '',
+      content_preview: data.content
+        ? String(data.content).substring(0, 50)
+        : '',
       data: data.data,
       session_id: data.session_id,
-      assistant_message_id: data.assistant_message_id,
+      assistant_message_id: data.assistant_message_id
     })
 
     // Persistence can fail after the entire answer has streamed. Surface the
     // failure separately; the generic error path replaces the answer content.
-    if (data.response_type === 'error' && (data.data as ChatMessage | undefined)?.stage === 'message_persistence') {
+    if (
+      data.response_type === 'error' &&
+      (data.data as ChatMessage | undefined)?.stage === 'message_persistence'
+    ) {
       const message = resolveActiveAssistantMessage(data)
       const errorMsg = String(data.content || t('chat.processError'))
       if (message) {
@@ -1113,7 +1257,10 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
 
     if (data.response_type === 'agent_query') {
       if (data.id) replaySegments.delete(String(data.id))
-      const replay = resetSteerTurnForReplay(messagesList, String(data.id || ''))
+      const replay = resetSteerTurnForReplay(
+        messagesList,
+        String(data.id || '')
+      )
       if (replay) replaySegments.set(String(data.id), replay)
       if (data.id) {
         const earlyMsg = getTrailingIncompleteAssistant()
@@ -1121,20 +1268,26 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       }
       if (data.assistant_message_id) {
         currentAssistantMessageId.value = data.assistant_message_id as string
-        log('[Agent Query] Saved assistant message ID:', data.assistant_message_id)
+        log(
+          '[Agent Query] Saved assistant message ID:',
+          data.assistant_message_id
+        )
       }
       log('[Agent Query Event]', {
-        session_id: data.session_id || (data.data as ChatMessage | undefined)?.session_id,
+        session_id:
+          data.session_id || (data.data as ChatMessage | undefined)?.session_id,
         assistant_message_id: data.assistant_message_id,
         query: (data.data as ChatMessage | undefined)?.query,
-        request_id: (data.data as ChatMessage | undefined)?.request_id,
+        request_id: (data.data as ChatMessage | undefined)?.request_id
       })
 
-      let existingMessage = replay || findLastMessage(
-        (item) =>
-          item.role === 'assistant' &&
-          (item.id === data.id || item.request_id === data.id),
-      )
+      let existingMessage =
+        replay ||
+        findLastMessage(
+          item =>
+            item.role === 'assistant' &&
+            (item.id === data.id || item.request_id === data.id)
+        )
       const created = !existingMessage
       if (!existingMessage) {
         const assistantId = data.assistant_message_id as string | undefined
@@ -1150,7 +1303,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
           agentEventStream: [],
           _eventMap: new Map(),
           _pendingToolCalls: new Map(),
-          knowledge_references: [],
+          knowledge_references: []
         }
         messagesList.push(existingMessage)
         emitMessageCreated(existingMessage)
@@ -1168,7 +1321,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       bindServerTurnTimestamps(
         messagesList,
         (data.data as Record<string, unknown> | undefined) || data,
-        existingMessage,
+        existingMessage
       )
       onAgentQuery?.(data, existingMessage, created)
       return
@@ -1193,9 +1346,11 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
         activeAssistant?.request_id === data.id ||
         activeAssistant?.id === data.id)
     const isAgentAnswerChunk =
-      data.response_type === 'answer' && (isAgentStreamSession() || targetsActiveAgentRequest)
+      data.response_type === 'answer' &&
+      (isAgentStreamSession() || targetsActiveAgentRequest)
     const isAgentCompleteChunk =
-      data.response_type === 'complete' && (isAgentStreamSession() || targetsActiveAgentRequest)
+      data.response_type === 'complete' &&
+      (isAgentStreamSession() || targetsActiveAgentRequest)
 
     const shouldHandleAsAgent =
       isAgentOnlyResponse ||
@@ -1231,7 +1386,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
 
     if (data.response_type === 'stop') {
       log('[Stop Event] Non-agent generation stopped')
-      const stoppedMessage = findLastMessage((item) => {
+      const stoppedMessage = findLastMessage(item => {
         if (item.role !== 'assistant') return false
         if (item.request_id === data.id) return true
         return item.id === data.id
@@ -1245,7 +1400,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       return
     }
 
-    const existingMessage = findLastMessage((item) => {
+    const existingMessage = findLastMessage(item => {
       if (item.role !== 'assistant') return false
       if (item.request_id === data.id) return true
       return item.id === data.id
@@ -1254,7 +1409,8 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       if (existingMessage.is_completed) return
       const metadata = data.data as ChatMessage | undefined
       applyFinalArtifactContent(existingMessage, metadata?.final_content)
-      if (Array.isArray(metadata?.artifacts)) existingMessage.artifacts = metadata.artifacts
+      if (Array.isArray(metadata?.artifacts))
+        existingMessage.artifacts = metadata.artifacts
       const usage = metadata?.usage || data.usage
       if (usage) existingMessage.usage = usage
       existingMessage.artifactsCollecting = false
@@ -1271,7 +1427,9 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       return
     }
     if (existingMessage?.is_completed && data.done && !data.content) {
-      log('[Non-Agent] Ignoring duplicate completion event for completed message')
+      log(
+        '[Non-Agent] Ignoring duplicate completion event for completed message'
+      )
       return
     }
 
@@ -1281,23 +1439,35 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       content: '',
       role: 'assistant',
       showThink: false,
-      is_completed: false,
+      is_completed: false
     }
 
-    if ((data.data as ChatMessage | undefined)?.is_fallback) obj.is_fallback = true
+    if ((data.data as ChatMessage | undefined)?.is_fallback)
+      obj.is_fallback = true
 
     const thinkCloseTag = '</think>'
-    if (fullContent.value.includes('<think>') && !fullContent.value.includes(thinkCloseTag)) {
+    if (
+      fullContent.value.includes('<think>') &&
+      !fullContent.value.includes(thinkCloseTag)
+    ) {
       obj.thinking = true
       obj.showThink = true
       obj.content = ''
       obj.thinkContent = fullContent.value.replace('<think>', '').trim()
-    } else if (fullContent.value.includes('<think>') && fullContent.value.includes(thinkCloseTag)) {
+    } else if (
+      fullContent.value.includes('<think>') &&
+      fullContent.value.includes(thinkCloseTag)
+    ) {
       obj.thinking = false
       obj.showThink = true
       const index = fullContent.value.lastIndexOf(thinkCloseTag)
-      obj.thinkContent = fullContent.value.substring(0, index).replace('<think>', '').trim()
-      obj.content = fullContent.value.substring(index + thinkCloseTag.length).trim()
+      obj.thinkContent = fullContent.value
+        .substring(0, index)
+        .replace('<think>', '')
+        .trim()
+      obj.content = fullContent.value
+        .substring(index + thinkCloseTag.length)
+        .trim()
     } else {
       obj.content = fullContent.value
     }
@@ -1329,6 +1499,6 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
     handleMsgList,
     processStreamChunk,
     prepareForNewOutgoingMessage,
-    markInFlightAssistantStopped,
+    markInFlightAssistantStopped
   }
 }
