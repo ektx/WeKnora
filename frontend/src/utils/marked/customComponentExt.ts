@@ -35,9 +35,8 @@ export const customComponentExtension = {
     return undefined
   },
 
-  // renderer: 生成自定义 HTML
   renderer(token: any) {
-    const content = token.content // 例如 "title: 自定义节点\nsubtitle: ...\nbtn(value1): 确认..."
+    const { content, componentName } = token // 例如 "title: 自定义节点\nsubtitle: ...\nbtn(value1): 确认..."
     const lines = content
       .split('\n')
       .map((line: string) => line.trim())
@@ -73,58 +72,12 @@ export const customComponentExtension = {
       // 其他行忽略 (也可以选择追加到某个字段, 但按需忽略)
     }
 
-    // 构建 DOM 字符串
-    // 标题 (如果有)
-    let html = '<div class="component-name">'
-    html += '<div class="component-header">'
-    if (title) {
-      // 避免XSS: 简单转义, 实际生产建议更严谨
-      const safeTitle = title.replace(/[&<>"]/g, function (m) {
-        if (m === '&') return '&amp;'
-        if (m === '<') return '&lt;'
-        if (m === '>') return '&gt;'
-        if (m === '"') return '&quot;'
-        return m
-      })
-      html += `<div class="component-title">${safeTitle}</div>`
-    }
-    if (subtitle) {
-      const safeSubtitle = subtitle.replace(/[&<>"]/g, function (m) {
-        if (m === '&') return '&amp;'
-        if (m === '<') return '&lt;'
-        if (m === '>') return '&gt;'
-        if (m === '"') return '&quot;'
-        return m
-      })
-      html += `<div class="component-subtitle">${safeSubtitle}</div>`
-    }
-    html += '</div>' // 结束 component-header
-
-    // 按钮组 (如果有按钮)
-    if (buttons.length > 0) {
-      html += '<div class="button-group">'
-      // 为了美观: 第一个按钮可能是主要操作? 这里根据key或顺序把第一个设为primary? 不用过度设计, 但为了视觉区分: 第一个加primary类
-      // 也可以根据用户意图，这里按照第一个为primary，其余为default (视觉上更舒服)
-      buttons.forEach((btn, index) => {
-        const btnClass = index === 0 ? 'btn primary' : 'btn'
-        // 简单转义label
-        const safeLabel = btn.label.replace(/[&<>"]/g, function (m: string) {
-          if (m === '&') return '&amp;'
-          if (m === '<') return '&lt;'
-          if (m === '>') return '&gt;'
-          if (m === '"') return '&quot;'
-          return m
-        })
-        // 保留 data-key 属性，便于识别
-        const keyAttr = btn.key
-          ? ` data-key="${btn.key.replace(/"/g, '&quot;')}"`
-          : ''
-        html += `<button class="${btnClass}"${keyAttr}>${safeLabel}</button>`
-      })
-      html += '</div>' // 结束 button-group
-    }
-
-    html += '</div>' // 结束 component-name
-    return html
+    const payload = JSON.stringify({ title, subtitle, buttons })
+    // 把组件名写进 data-component，供 Vue 动态解析
+    return `<div class="vue-component-slot" 
+      data-component="${componentName}" 
+      data-props='${payload}'
+    >${content}</div>
+    `
   }
 }
