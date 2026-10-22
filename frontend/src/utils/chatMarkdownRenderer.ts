@@ -91,6 +91,30 @@ export function replaceIncompleteImageWithPlaceholder(content: string): string {
   return content
 }
 
+/**
+ * 处理自定义组件的渲染模式
+ * @param content
+ */
+export function replaceCustomComponent(content: string): string {
+  if (!content) return ''
+
+  const lastCustomComponentStart = content.lastIndexOf(':::')
+  if (lastCustomComponentStart < 0) return content
+
+  const tail = content.slice(lastCustomComponentStart)
+  const hasOpen = /:::\s*([\w-]+)\s*\n/.test(tail)
+  const lineBreak = tail.lastIndexOf('\n')
+  const hasColse = tail.slice(lineBreak).includes(':::')
+
+  if (hasOpen && !hasColse) {
+    return (
+      content.slice(0, lastCustomComponentStart) + STREAMING_IMAGE_PLACEHOLDER
+    )
+  }
+
+  return content
+}
+
 const LEGACY_IMAGE_BLOCK_RE = /<image\b([^>]*)>([\s\S]*?)<\/images?>/gi
 const LEGACY_IMAGES_WRAPPER_RE = /<\/?images\b[^>]*>/gi
 const LEGACY_IMAGE_ORIGINAL_RE = /<image_original>([\s\S]*?)<\/image_original>/i
@@ -508,7 +532,7 @@ export function renderChatMarkdown(
   const rawText =
     typeof rawMarkdown === 'string' ? rawMarkdown : String(rawMarkdown || '')
   if (!rawText.trim()) return ''
-  debugger
+
   console.log('>', options.streaming)
   console.log('renderChatMarkdown', rawText)
 
@@ -532,7 +556,8 @@ export function renderChatMarkdown(
   // single token before parsing.
   const artifactSafe = normalizeSandboxArtifactRefs(normalizedImageMarkdown)
   const imageSafe = replaceIncompleteImageWithPlaceholder(artifactSafe)
-  const mathSafe = preprocessMathDelimiters(imageSafe)
+  const customComponentSafe = replaceCustomComponent(imageSafe)
+  const mathSafe = preprocessMathDelimiters(customComponentSafe)
   const restoredTags = restoreCitationTags(mathSafe, tags)
   const inlineTags = joinCitationTagsToPreviousLine(restoredTags)
   // Run the list-marker guard again after emphasis balancing: closing/hiding a
