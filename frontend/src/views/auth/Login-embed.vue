@@ -86,8 +86,8 @@ const handleLogin = async () => {
 
     const response = await login({
       // email:'zhuwl@sanyou.com',
-      // email: 'guest@sanyou.com',
-      email: 'zhangz@sanyou.com',
+      email: 'guest@sanyou.com',
+      // email: 'zhangz@sanyou.com',
       password: 'sanyou123',
     })
 
