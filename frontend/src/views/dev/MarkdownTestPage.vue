@@ -1,6 +1,7 @@
 <template>
-  <div class="markdown-test-page">
+  <div class="markdown-test-page" ref="rootContainer">
     <h1 class="page-title">Markdown Rendering Test</h1>
+
     <p class="page-desc">
       Dev-only page for visual regression testing of chat answer markdown (same
       typography as botmsg / AgentStreamDisplay / embed). Add new test cases or
@@ -171,7 +172,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import {
+  ref,
+  render as vueRender,
+  computed,
+  onMounted,
+  nextTick,
+  watch,
+  h
+} from 'vue'
 import 'katex/dist/katex.min.css'
 import { sanitizeMarkdownHTML } from '@/utils/security'
 import {
@@ -191,12 +200,15 @@ import {
   injectCachedMermaidSvg
 } from '@/utils/chatMessageShared'
 
+import MyComponent from '@/utils/marked/MyComponent.vue'
+
 ensureMermaidInitialized()
 
 const mermaidRenderer = createChatMarkdownRenderer({
   codeRenderer: createMermaidCodeRenderer('mermaid-test')
 })
 
+const rootContainer = ref<HTMLElement | null>(null)
 const mermaidContainer = ref<HTMLElement | null>(null)
 const streamContainer = ref<HTMLElement | null>(null)
 const customContainer = ref<HTMLElement | null>(null)
@@ -341,7 +353,7 @@ graph TD
 \`\`\`
 `
 
-const customNodeSample = `::: control
+const customNodeSample = `::: MyComponent
 title: 自定义节点
 subtitle: 通过自定义节点类型和样式
 btn(value1): 确认
@@ -352,6 +364,12 @@ btn(value3): 关闭
 
 // --- Streaming Simulation ---
 const fullStreamText = `
+${customNodeSample}
+
+![](https://via.placeholder.com/150)
+
+${mermaidSample}
+
 好的，以下是根据知识库中**《xxx》学程手册**整理的有关XXX的介绍：
 
 **XBRL（eXtensible Business Reporting Language，可扩展商业报告语言）**是一种基于XML的标准化标记语言，专门用于电子化商业和财务报告的编制、交换和分析
@@ -361,8 +379,6 @@ const fullStreamText = `
 APR = ((Fees + Interest) / Principal) × (365 / Days in Loan Term)
 \`\`\`
 <kb doc="2502.08127v1.pdf" chunk_id="1ecdce8a-f922-4d0c-b124-257ab4634da2" />
-
-${customNodeSample}
 
 ### 重要性
 
@@ -555,6 +571,8 @@ const resetStream = () => {
 const refreshMermaid = async (root?: HTMLElement | null) => {
   await nextTick()
   await enhanceMarkdownContainer(root ?? mermaidContainer.value)
+
+  mountVueComponents()
 }
 
 onMounted(() => refreshMermaid())
@@ -586,6 +604,71 @@ watch(customInput, () => {
     void refreshMermaid(customContainer.value)
   }, 200)
 })
+
+const componentRegistry: Record<string, any> = {
+  MyComponent
+  // 或者用 kebab-case: 'my-button': MyButton
+}
+
+/**
+ * 将 marked 渲染出的占位符节点（.vue-component-slot）
+ * 替换成真正的 Vue 组件实例。
+ *
+ * 流程：
+ *  1. 从 rootContainer 中找出所有占位符
+ *  2. 读取占位符上的组件名（data-component）和 props（data-props）
+ *  3. 从注册表 componentRegistry 中查找对应的 Vue 组件
+ *  4. 创建一个临时容器替换占位符
+ *  5. 用 vueRender 把 Vue 组件挂载到该容器上
+ */
+function mountVueComponents() {
+  // 获取承载 markdown 渲染结果的根 DOM 元素
+  // 一般是 <div ref="rootContainer" v-html="..."></div>
+  const root = rootContainer.value
+  // 如果根元素还没挂载（例如组件尚未 onMounted），直接返回
+  if (!root) return
+
+  // 遍历所有由 marked 生成的占位符节点
+  // 每个占位符对应一个 ::: ComponentName 块
+  root.querySelectorAll('.vue-component-slot').forEach(el => {
+    // 从 data-component 读取组件名
+    // 例如 data-component="MyButton" 或 "user-card"
+    const name = el.getAttribute('data-component')!
+
+    // 从 data-props 读取组件 props（JSON 字符串），解析成对象
+    // 若属性不存在，兜底为空对象，避免 JSON.parse 报错
+    const props = JSON.parse(el.getAttribute('data-props') || '{}')
+
+    // 支持 PascalCase 和 kebab-case 两种查找
+    //   componentRegistry['MyButton'] 命中
+    //   componentRegistry['my-button'] 未命中时，转成 'myButton' 再查一次
+    // 注：这里用 replace 把 -x 转成 X，得到 camelCase
+    const Comp =
+      componentRegistry[name] ||
+      componentRegistry[name.replace(/-(\w)/g, (_, c) => c.toUpperCase())]
+
+    // 如果两种写法都找不到对应组件，给出警告并跳过
+    // 不抛出异常是为了让其他占位符仍能正常渲染
+    if (!Comp) {
+      console.warn(`未注册的组件: ${name}`)
+      return
+    }
+
+    // 创建一个临时容器 div，用于承载 Vue 组件
+    // 之所以要新建容器，是因为 render 会把 vnode 渲染到指定 DOM 中，
+    // 直接复用占位符 el 也可以，但替换成新容器更干净、避免残留 class
+    const container = document.createElement('div')
+
+    // 用新容器替换原占位符节点
+    // 此时原占位符从 DOM 中移除，container 占据其位置
+    el.replaceWith(container)
+
+    // 用 Vue 的 render 函数把组件挂载到 container 上
+    // vueRender 即从 'vue' 导入的 render，签名为 render(vnode, container)
+    // h(Comp, props) 创建一个组件 vnode，props 会作为组件的 props 传入
+    vueRender(h(Comp, props), container)
+  })
+}
 </script>
 
 <style lang="less" scoped>
