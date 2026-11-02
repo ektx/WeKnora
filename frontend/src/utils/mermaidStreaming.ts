@@ -18,7 +18,6 @@ export const replaceIncompleteMermaidWithPlaceholder = (
 
   const tail = content.slice(start + MERMAID_FENCE_START.length)
   if (tail.includes('```')) return content
-  debugger
 
   return content.slice(0, start) + placeholder
 }

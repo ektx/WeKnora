@@ -4,7 +4,12 @@
     <p>{{ subtitle }}</p>
 
     <div class="btns">
-      <t-button theme="default" v-for="button in buttons" :key="button?.label">
+      <t-button
+        theme="default"
+        v-for="button in buttons"
+        :key="button?.label"
+        @click="onClick(button)"
+      >
         {{ button?.label }}
       </t-button>
     </div>
@@ -21,6 +26,10 @@ interface Props {
 }
 
 const { title, subtitle, buttons } = defineProps<Props>()
+
+const onClick = (button: { label: string }) => {
+  console.log('clicked', button)
+}
 </script>
 
 <style lang="css">

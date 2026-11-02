@@ -364,6 +364,12 @@ btn(value3): 关闭
 
 // --- Streaming Simulation ---
 const fullStreamText = `
+<kb doc="2502.08127v1.pdf" chunk_id="1ecdce8a-f922-4d0c-b124-257ab4634da2" />
+
+${customNodeSample}
+
+${customNodeSample}
+
 ${customNodeSample}
 
 ![](https://via.placeholder.com/150)

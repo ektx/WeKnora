@@ -74,10 +74,26 @@ export const customComponentExtension = {
 
     const payload = JSON.stringify({ title, subtitle, buttons })
     // 把组件名写进 data-component，供 Vue 动态解析
-    return `<div class="vue-component-slot" 
-      data-component="${componentName}" 
-      data-props='${payload}'
-    >${content}</div>
-    `
+    // return `<div class="vue-component-slot"
+    //   data-component="${componentName}"
+    //   data-props='${payload}'
+    // >${content}</div>
+    // `
+
+    return `<div class="my-component">
+    <h1>${title}</h1>
+    <p>${subtitle}</p>
+
+    <div class="btns">
+      <t-button
+        theme="default"
+        v-for="button in buttons"
+        :key="button?.label"
+        @click="onClick(button)"
+      >
+        {{ button?.label }}
+      </t-button>
+    </div>
+  </div>`
   }
 }

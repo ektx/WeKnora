@@ -1791,6 +1791,7 @@ const artifactRefLabels = computed(() => ({
   missingHint: t('agent.artifactDrawer.inlineMissing')
 }))
 
+// 绑定鼠标的相关交互 如 hover
 const {
   float: citationFloat,
   rebind: rebindCitations,
@@ -2262,6 +2263,7 @@ watch(
   eventStream,
   stream => {
     if (!stream || !Array.isArray(stream)) return
+    console.warn(stream)
 
     // Scan stream to find thinking events to expand and collapse
     const newActiveIds = new Set<string>()
@@ -2303,7 +2305,7 @@ watch(
       )
       await enhanceMarkdownContainer(rootElement.value)
 
-      mountVueComponents()
+      // mountVueComponents()
 
       // Auto-scroll thinking detail content to bottom during streaming
       if (newActiveIds.size > 0 && rootElement.value) {
@@ -2496,7 +2498,7 @@ watch(
         protectedFileAccess.value
       )
       await enhanceMarkdownContainer(rootElement.value)
-      mountVueComponents()
+      // mountVueComponents()
     })
   },
   { immediate: true }

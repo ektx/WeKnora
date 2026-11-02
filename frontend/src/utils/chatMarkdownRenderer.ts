@@ -91,26 +91,116 @@ export function replaceIncompleteImageWithPlaceholder(content: string): string {
   return content
 }
 
+// ============================================================
+// 自定义围栏组件（:::name ... :::）流式处理
+// ============================================================
+
+/** 行首开围栏：兼容 `:::Name`、`::: Name`、`:::Name ` 等 */
+const FENCE_OPEN_LINE_RE = /^[ \t]*:::[ \t]*([\w-]+)[ \t]*$/gm
+/** 行首闭围栏：兼容 `:::`、` ::: ` 等 */
+const FENCE_CLOSE_LINE_RE = /^[ \t]*:::[ \t]*$/gm
+// /** 匹配文本末尾可能的：冒号残缺、带空格的残缺（用于兜底掩盖流式打字过程） */
+// const FENCE_PARTIAL_TAIL_RE = /(^|\n)([ \t]*:{1,3}[ \t]*[\w-]*[ \t]*)$/
+
+/** 未闭合自定义组件的占位 HTML */
+function customComponentPlaceholder(name: string = 'block'): string {
+  const safeName = (name || 'block').replace(/[^\w-]/g, '')
+  return `<div class="streaming-custom-component" data-component="${safeName}" style="min-height:120px; border: 1px dashed #ccc; border-radius: 4px; margin: 8px 0;"></div>`
+}
+
+type FenceSpan = { start: number; end: number; name: string }
+type FenceScanResult = {
+  completeRanges: Array<[number, number]>
+  danglingStart: number | null
+  danglingName: string
+}
+
+function scanCustomComponentFences(content: string): FenceScanResult {
+  // 强制重置 lastIndex 防止正则全局匹配污染
+  FENCE_OPEN_LINE_RE.lastIndex = 0
+  FENCE_CLOSE_LINE_RE.lastIndex = 0
+
+  const opens: FenceSpan[] = []
+  const closes: FenceSpan[] = []
+
+  // 收集所有开标签
+  let match
+  while ((match = FENCE_OPEN_LINE_RE.exec(content)) !== null) {
+    opens.push({
+      name: match[1],
+      start: match.index,
+      end: match.index + match[0].length
+    })
+  }
+  // 收集所有闭标签
+  while ((match = FENCE_CLOSE_LINE_RE.exec(content)) !== null) {
+    closes.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      name: ''
+    })
+  }
+
+  const completeRanges: Array<[number, number]> = []
+  let danglingStart: number | null = null
+  let danglingName = 'block'
+  let closePtr = 0
+
+  for (let i = 0; i < opens.length; i++) {
+    const open = opens[i]
+    const nextOpenStart = opens[i + 1]?.start ?? Infinity
+
+    // 跳过在 open 之前的 close
+    while (closePtr < closes.length && closes[closePtr].start < open.end) {
+      closePtr++
+    }
+
+    const close = closes[closePtr]
+    if (close && close.start < nextOpenStart) {
+      // 配对成功
+      completeRanges.push([open.start, close.end])
+      closePtr++
+    } else {
+      // 没有配对的 close，标记为 dangling
+      danglingStart = open.start
+      danglingName = open.name
+      break
+    }
+  }
+
+  return { completeRanges, danglingStart, danglingName }
+}
+
 /**
- * 处理自定义组件的渲染模式
- * @param content
+ * 流式处理自定义组件（终极版）：
+ * 1. 精准配对，已闭合的块交给 marked 渲染，绝不误伤前面的内容。
+ * 2. 发现未闭合的完整开标签，直接从头拦截，替换为占位 div。
+ * 3. 发现末尾正在打字的 `::` 或 `::: Na`，也直接拦截，防止闪烁。
  */
 export function replaceCustomComponent(content: string): string {
-  if (!content) return ''
+  if (!content || !content.includes(':')) return content
 
-  const lastCustomComponentStart = content.lastIndexOf(':::')
-  if (lastCustomComponentStart < 0) return content
+  const { danglingStart, danglingName } = scanCustomComponentFences(content)
 
-  const tail = content.slice(lastCustomComponentStart)
-  const hasOpen = /:::\s*([\w-]+)\s*\n/.test(tail)
-  const lineBreak = tail.lastIndexOf('\n')
-  const hasColse = tail.slice(lineBreak).includes(':::')
-
-  if (hasOpen && !hasColse) {
+  // 1. 如果找到了未闭合的块
+  if (danglingStart !== null) {
     return (
-      content.slice(0, lastCustomComponentStart) + STREAMING_IMAGE_PLACEHOLDER
+      content.slice(0, danglingStart) + customComponentPlaceholder(danglingName)
     )
   }
+
+  // 2. 兜底：没有未闭合的完整块，但末尾可能正在输入 `::` 或 `:::xxx`
+  // 这是因为有的流式截断可能刚好卡在名称上，导致 FENCE_OPEN_LINE_RE 没抓到。
+  // const partialMatch = content.match(FENCE_PARTIAL_TAIL_RE)
+  // if (partialMatch) {
+  //   const tailStr = partialMatch[2] // 包含换行后的内容
+  //   // 确保最后一行确实只是 ::: 或 ::: 名字，而不是普通的中文冒号（如“注意：”）
+  //   if (/^[ \t]*:{1,3}[ \t]*[\w-]*[ \t]*$/.test(tailStr)) {
+  //     const cutIndex =
+  //       content.length - partialMatch[0].length + partialMatch[1].length
+  //     return content.slice(0, cutIndex) + customComponentPlaceholder()
+  //   }
+  // }
 
   return content
 }
@@ -548,6 +638,8 @@ export function renderChatMarkdown(
     Boolean(options.streaming)
   )
   const citationSafeText = stripIncompleteCitationTag(imageContextSafeText)
+  debugger
+  // 将 <kb/> 标签内容提取出来
   const { text: tagSafe, tags } = preserveCitationTags(citationSafeText)
   const normalizedImageMarkdown =
     normalizeFullwidthMarkdownImageParentheses(tagSafe)
@@ -558,6 +650,7 @@ export function renderChatMarkdown(
   const imageSafe = replaceIncompleteImageWithPlaceholder(artifactSafe)
   const customComponentSafe = replaceCustomComponent(imageSafe)
   const mathSafe = preprocessMathDelimiters(customComponentSafe)
+  // 将<kb/> 标签提取的内容重新填写到文本中
   const restoredTags = restoreCitationTags(mathSafe, tags)
   const inlineTags = joinCitationTagsToPreviousLine(restoredTags)
   // Run the list-marker guard again after emphasis balancing: closing/hiding a
@@ -573,6 +666,7 @@ export function renderChatMarkdown(
     ? options.prepareMarkdown(balancedInline, options.cachedMermaidSvgHtml)
     : balancedInline
   const flankingSafeMarkdown = repairFlankingEmphasis(preparedMarkdown)
+  // 将<kb/> 标签内容重新包装 并提取对应的标签html
   // Convert <kb>/<web>/wiki tags to HTML placeholders before escapeMarkdown so
   // agent sanitizers (e.g. UUID stripping) cannot damage chunk_id attributes.
   const { content: markdownWithPlaceholders, htmlSnippets } =
@@ -586,6 +680,7 @@ export function renderChatMarkdown(
     breaks: true,
     async: false
   }) as string
+  // 将<kb/> 标签包装的内容与htmlSnippets进行匹配
   const restoredHtml = restoreCitationHtmlPlaceholders(html, htmlSnippets)
   const citationHtml =
     options.collapseStandaloneCitations === false
